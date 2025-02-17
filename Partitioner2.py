@@ -924,7 +924,7 @@ class PartitionMerger:
         print(f"Move to level {current_level}")
     return total_merge_cnt
 
-  def merge_neighbors(self):
+  def merge_siblings(self):
 
     self.check_hg()
 
@@ -935,27 +935,38 @@ class PartitionMerger:
 
     current_level = 0
 
+    nodes_no_feasible_merge = set()
+
     while len(self.hg.levels) > current_level + 1:
       merge_cnt = 0
 
       for n in self.hg.levels[current_level]:
-        successors = list(filter(lambda x: x not in self.exclude_part_ids, self.hg.get_node_successors(n)))
+        if n in nodes_no_feasible_merge:
+          continue
+
+        successors = list(filter(lambda x: x not in self.exclude_part_ids and self.hg.node_to_level[x] == current_level + 1, self.hg.get_node_successors(n)))
 
         successors.sort(key = lambda x: self.node_id_to_part[x].max_live_vars)
 
 
         if len(successors) < 2:
+          nodes_no_feasible_merge.add(n)
           continue
 
-        successor_min_live_vars = self.node_id_to_part[successors[0]].max_live_vars
+        successors_live_vars = list(map(lambda x: self.node_id_to_part[x].max_live_vars, successors))
         while len(successors) > 1:
           # pop largest parts until it's possible to merge
-          successors_max_live_vars = self.node_id_to_part[successors[-1]].max_live_vars
-          if successor_min_live_vars + successors_max_live_vars <= 32:
+          total_live_vars = sum(successors_live_vars)
+          if total_live_vars <= 32:
             break
           else:
             #unlikely mergeable
             successors.pop()
+            successors_live_vars.pop()
+
+        if len(successors) <= 2:
+          nodes_no_feasible_merge.add(n)
+          continue
 
         while len(successors) >= 2:
           to = successors[0]
@@ -963,17 +974,22 @@ class PartitionMerger:
           succ = self.try_merge_upart_nodes(to, from_nodes, True)
 
           if succ:
-            # self.hg.graph_gc()
+            self.hg.graph_gc()
+            self.hg.levelize()
             # self.hg.check_graph()
+            # print(f"Succesfully merge {len(successors)} nodes")
             merge_cnt += 1
             break
           else:
             successors.pop()
       
       if merge_cnt != 0:
+        print(f"Level {current_level} merged {merge_cnt} groups")
         total_merge_cnt += merge_cnt
       else:
         current_level += 1
+        nodes_no_feasible_merge.clear()
+        print(f"Move to level {current_level}")
 
         self.hg.graph_gc()
         self.hg.levelize()
@@ -1093,8 +1109,8 @@ if __name__ == "__main__":
 
 
   while True:
-    print("> Merge neighbors")
-    merge_cnt = merger.merge_neighbors()
+    print("> Merge siblings")
+    merge_cnt = merger.merge_siblings()
     print(f"{merge_cnt} merge ops")
 
     # re levelize
@@ -1106,6 +1122,29 @@ if __name__ == "__main__":
 
 
 
+  while True:
+    print("> Merge with child2")
+    merge_cnt = merger.merge_direct_child()
+    print(f"Merged {merge_cnt} parts")
+
+    # re levelize
+    merger.hg.levelize()
+    if merge_cnt < 10:
+      break
+
+  merger.print_part_stat()
+
+  while True:
+    print("> Merge adjacent groups2")
+    merge_cnt = merger.merge_adjacent_group_2()
+    print(f"{merge_cnt} merge ops")
+
+    # re levelize
+    merger.hg.levelize()
+    if merge_cnt == 0:
+      break
+
+  merger.print_part_stat()
 
   print("> Done")
   Utils.print_memory_usage()

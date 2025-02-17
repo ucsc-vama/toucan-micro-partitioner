@@ -99,8 +99,8 @@ class DirectedHyperGraph:
 
       current_level = source_level
 
-
-      while current_level <= nodes_to_merge_max_level and len(fringe) != 0:
+      # + 1: extra safe guard
+      while current_level <= nodes_to_merge_max_level + 1 and len(fringe) != 0:
         current_level_fringe = set(filter(lambda x: self.node_to_level[x] == current_level, fringe))
 
         fringe_next = fringe.difference(current_level_fringe)
@@ -144,6 +144,7 @@ class DirectedHyperGraph:
       from_list_input_hes.update(self.get_input_hyperedges(n))
 
     for n in all_nodes:
+      assert(self.graph.nodes[n]['type'] == 'node')
       output_hes = self.get_output_hyperedges(n)
       if len(output_hes) > 1:
         print(f"Node has {len(output_hes)} output hes")
