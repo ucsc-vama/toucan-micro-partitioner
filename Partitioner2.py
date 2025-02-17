@@ -974,8 +974,8 @@ class PartitionMerger:
           succ = self.try_merge_upart_nodes(to, from_nodes, True)
 
           if succ:
-            self.hg.graph_gc()
-            self.hg.levelize()
+            # self.hg.graph_gc()
+            # self.hg.levelize()
             # self.hg.check_graph()
             # print(f"Succesfully merge {len(successors)} nodes")
             merge_cnt += 1
@@ -984,12 +984,12 @@ class PartitionMerger:
             successors.pop()
       
       if merge_cnt != 0:
-        print(f"Level {current_level} merged {merge_cnt} groups")
+        # print(f"Level {current_level} merged {merge_cnt} groups")
         total_merge_cnt += merge_cnt
       else:
         current_level += 1
         nodes_no_feasible_merge.clear()
-        print(f"Move to level {current_level}")
+        # print(f"Move to level {current_level}")
 
         self.hg.graph_gc()
         self.hg.levelize()
