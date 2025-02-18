@@ -203,9 +203,14 @@ class MicroPartition:
 
   def _check_liveness_constraint(self):
     # At any time, live values should not exceed GPU_WARP_SIZE
-    if len(self.var_life_cycle) == 0:
-      # It's possible that this part only contains output node (no edges)
-      return True
+    assert(len(self.var_life_cycle) != 0)
+    # if len(self.var_life_cycle) == 0:
+    #   # It's possible that node have either no input and no output
+    #   for n in self.nodes:
+    #     print(self.G.nodes[n])
+    #     assert(self.G.in_degree(n) == 0 and self.G.out_degree(n) == 0)
+    #   self.max_live_vars = 1
+    #   return True
     
 
 
@@ -394,6 +399,7 @@ def partitioner2(G, excluded_nodes: set):
       last_level -= 1
 
     assert(part.check_correctness())
+    assert(part.max_live_vars is not None)
     partitions.append(part)
 
     visited.update(part.nodes)
@@ -538,11 +544,13 @@ class PartitionMerger:
       assert(isinstance(self.node_id_to_part[n], MicroPartition))
 
     new_part = self.node_id_to_part[to].copy()
+    new_nodes = set()
     for n in from_nodes:
       from_part = self.node_id_to_part[n]
-      new_part.nodes.update(from_part.nodes)
+      new_nodes.update(from_part.nodes)
 
-    good_to_merge = new_part.check_correctness()
+    assert(len(new_nodes) != 0)
+    good_to_merge = new_part.try_add_nodes(new_nodes)
 
     if not good_to_merge:
       return False
@@ -565,6 +573,8 @@ class PartitionMerger:
   def check_hg(self):
     for n in self.hg.all_nodes():
       assert(self.hg.graph.out_degree(n) <= 1)
+      if isinstance(self.node_id_to_part[n], MicroPartition):
+        assert(self.node_id_to_part[n].max_live_vars is not None)
 
     for he in self.hg.all_hyperedges():
       assert(len(self.hg.get_hyperedge_sources(he)) == 1)
@@ -996,6 +1006,59 @@ class PartitionMerger:
     return total_merge_cnt
   
 
+  def merge_same_level(self):
+    self.check_hg()
+
+
+    total_merge_cnt = 0
+
+    current_level = 0
+
+    # nodes_no_feasible_merge = set()
+
+    while len(self.hg.levels) > current_level + 1:
+      merge_cnt = 0
+
+
+      nodes_valid = list(filter(lambda x: x in self.node_id_to_part and x not in self.exclude_part_ids, self.hg.levels[current_level]))
+
+      for n in nodes_valid:
+        if not isinstance(self.node_id_to_part[n], MicroPartition):
+          print(self.node_id_to_part[n].__class__.__name__)
+          assert(False)
+
+      nodes_to_consider = list(filter(lambda x: self.node_id_to_part[x].max_live_vars < 32, nodes_valid))
+
+      nodes_to_consider.sort(key = lambda x: self.node_id_to_part[x].max_live_vars)
+
+
+      print(f"Level {current_level} has {len(nodes_to_consider)} nodes to consider")
+
+
+      while len(nodes_to_consider) > 1:
+        # pick largest
+        largest_node_id = nodes_to_consider[-1]
+        smallest_node_id = nodes_to_consider[0]
+
+        succ = self.try_merge_upart_nodes(largest_node_id, [smallest_node_id], False)
+        if succ:
+          merge_cnt += 1
+          nodes_to_consider.remove(smallest_node_id)
+        else:
+          nodes_to_consider.pop()
+        
+      
+      if merge_cnt != 0:
+        print(f"Level {current_level} merged {merge_cnt} groups")
+        total_merge_cnt += merge_cnt
+      else:
+        current_level += 1
+        print(f"Move to level {current_level}")
+
+        self.hg.graph_gc()
+        self.hg.levelize()
+    return total_merge_cnt
+  
 
 
 
@@ -1137,6 +1200,20 @@ if __name__ == "__main__":
   while True:
     print("> Merge adjacent groups2")
     merge_cnt = merger.merge_adjacent_group_2()
+    print(f"{merge_cnt} merge ops")
+
+    # re levelize
+    merger.hg.levelize()
+    if merge_cnt == 0:
+      break
+
+  merger.print_part_stat()
+
+
+
+  while True:
+    print("> Merge same level")
+    merge_cnt = merger.merge_same_level()
     print(f"{merge_cnt} merge ops")
 
     # re levelize
