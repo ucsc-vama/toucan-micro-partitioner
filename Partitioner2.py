@@ -108,6 +108,8 @@ class MicroPartition:
     self.var_life_cycle = {}
 
     self.max_live_vars = None
+    self.num_input_vars = None
+    self.num_output_vars = None
 
     # self.input_nodes = set()
     # self.output_nodes = set()
@@ -239,6 +241,7 @@ class MicroPartition:
 
     # print(f"checking liveness\nexternal input edge source: {str(current_live_vars)}")
     self.max_live_vars = len(current_live_vars)
+    self.num_input_vars = len(current_live_vars)
 
     for level in range(0, len(self.levels)):
 
@@ -270,7 +273,7 @@ class MicroPartition:
     else:
       assert(len(current_live_vars) == 0)
 
-    
+    self.num_output_vars = len(current_live_vars)    
     self.max_live_vars = max(len(current_live_vars), self.max_live_vars)
     if len(current_live_vars) > GPU_WARP_SIZE:
       return False
@@ -510,6 +513,9 @@ class PartitionMerger:
     
     norm_part_size = []
     norm_part_depth = []
+    norm_part_inputs = []
+    norm_part_outputs = []
+    norm_part_active_vars = []
     special_part_size = []
     special_part_depth = []
 
@@ -520,9 +526,17 @@ class PartitionMerger:
       else:
         norm_part_size.append(len(part.nodes))
         norm_part_depth.append(len(part.levels))
+        norm_part_inputs.append(part.num_input_vars)
+        norm_part_outputs.append(part.num_output_vars)
+        norm_part_active_vars.append(part.max_live_vars)
 
     print(f"Part graph has {max_levels} levels")
-    print(f"Has {len(norm_part_size)} normal parts, size: mean {statistics.mean(norm_part_size):.2f}, min {min(norm_part_size)}, max {max(norm_part_size)}, median {statistics.median(norm_part_size)}, depth: mean {statistics.mean(norm_part_depth):.2f}, min {min(norm_part_depth)}, max {max(norm_part_depth)}, median {statistics.median(norm_part_depth)}")
+    print(f"Has {len(norm_part_size)} normal parts:")
+    print(f"size: mean {statistics.mean(norm_part_size):.2f}, min {min(norm_part_size)}, max {max(norm_part_size)}, median {statistics.median(norm_part_size)}")
+    print(f"depth: mean {statistics.mean(norm_part_depth):.2f}, min {min(norm_part_depth)}, max {max(norm_part_depth)}, median {statistics.median(norm_part_depth)}")
+    print(f"input vars: mean {statistics.mean(norm_part_inputs):.2f}, min {min(norm_part_inputs)}, max {max(norm_part_inputs)}, median {statistics.median(norm_part_inputs)}")
+    print(f"output vars: mean {statistics.mean(norm_part_outputs):.2f}, min {min(norm_part_outputs)}, max {max(norm_part_outputs)}, median {statistics.median(norm_part_outputs)}")
+    print(f"max live vars: mean {statistics.mean(norm_part_active_vars):.2f}, min {min(norm_part_active_vars)}, max {max(norm_part_active_vars)}, median {statistics.median(norm_part_active_vars)}")
 
     print(f"Has {len(special_part_size)} special (vector) parts, size: mean {statistics.mean(special_part_size):.2f}, min {min(special_part_size)}, max {max(special_part_size)}, median {statistics.median(special_part_size)}, depth: mean {statistics.mean(special_part_depth):.2f}, min {min(special_part_depth)}, max {max(special_part_depth)}, median {statistics.median(special_part_depth)}")
 
@@ -1032,9 +1046,6 @@ class PartitionMerger:
       nodes_to_consider.sort(key = lambda x: self.node_id_to_part[x].max_live_vars)
 
 
-      print(f"Level {current_level} has {len(nodes_to_consider)} nodes to consider")
-
-
       while len(nodes_to_consider) > 1:
         # pick largest
         largest_node_id = nodes_to_consider[-1]
@@ -1049,11 +1060,11 @@ class PartitionMerger:
         
       
       if merge_cnt != 0:
-        print(f"Level {current_level} merged {merge_cnt} groups")
+        # print(f"Level {current_level} merged {merge_cnt} groups")
         total_merge_cnt += merge_cnt
       else:
         current_level += 1
-        print(f"Move to level {current_level}")
+        # print(f"Move to level {current_level}")
 
         self.hg.graph_gc()
         self.hg.levelize()
