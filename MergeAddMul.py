@@ -189,6 +189,17 @@ def test_graph(fileName = "design_before_cut.graph"):
   g.graph.remove_nodes_from(nodes_to_remove)
 
 
+  # Also remove dead sink nodes
+  nodes_to_remove.clear()
+  for n in g.graph.nodes():
+    if g.graph.in_degree(n) == 0 and g.graph.out_degree(n) == 0:
+      opName = g.graph.nodes[n]['op_name']
+      assert(opName in ["Print", "Stop"])
+      nodes_to_remove.append(n)
+  print(f"Remove {len(nodes_to_remove)} dead sink nodes")
+  g.graph.remove_nodes_from(nodes_to_remove)
+
+
   total_add_nodes = 0
   total_path_len = 0
   max_path_len = 0
