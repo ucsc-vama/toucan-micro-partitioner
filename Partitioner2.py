@@ -601,36 +601,37 @@ class PartitionMerger:
 
     merge_queue = []
 
-    for he in self.hg.all_hyperedges():
-      # each hyper edge
-      he_src = self.hg.get_hyperedge_sources(he)
-      he_dsts = self.hg.get_hyperedge_targets(he)
+    # for he in self.hg.all_hyperedges():
+    for n in self.hg.all_nodes():
+      merge_to = n
+      merge_froms = list(self.hg.get_node_successors(n))
 
-      assert(len(he_src) == 1)
-      assert(len(he_dsts) != 0)
-      he_src = he_src[0]
 
-      if he_src in self.exclude_part_ids:
+      if merge_to in self.exclude_part_ids:
+        continue
+
+      # TODO: Remove this?
+      if len(merge_froms) != 1:
         continue
 
 
-      # for he_dst in he_dsts:
-      if len(he_dsts) != 1:
+      if len(merge_froms) == 0:
         continue
 
-      he_dst = he_dsts[0]
-      he_src_level = self.hg.node_to_level[he_src]
-      he_dst_level = self.hg.node_to_level[he_dst]
 
-      if he_dst in self.exclude_part_ids:
+      merge_from = merge_froms[0]
+      merge_to_level = self.hg.node_to_level[merge_to]
+      merge_from_level = self.hg.node_to_level[merge_from]
+
+      if merge_from in self.exclude_part_ids:
         continue
 
-      if he_dst_level != he_src_level + 1:
+      if merge_from_level != merge_to_level + 1:
         # unnecessary and may cause cycle
         continue
 
       # can be considered to merge
-      merge_queue.append((he_src, he_dst))
+      merge_queue.append((merge_to, merge_from))
 
     # merge parts from small child to large
     merge_queue.sort(key = lambda pids: len(self.node_id_to_part[pids[1]].nodes))
@@ -641,6 +642,7 @@ class PartitionMerger:
     for pa, pb in merge_queue:
       # merge if both part has not been merged
       if pa in self.node_id_to_part and pb in self.node_id_to_part:
+        # merge or fail. No partial merge
         merge_ok = self.try_merge_upart_nodes(pa, [pb])
         if merge_ok:
           merge_cnt += 1
