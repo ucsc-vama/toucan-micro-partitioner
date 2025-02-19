@@ -653,66 +653,7 @@ class PartitionMerger:
     return merge_cnt
 
 
-  def merge_direct_childs(self):
-
-    self.check_hg()
-
-    merge_cnt = 0
-
-    merge_queue = []
-
-    for he in self.hg.all_hyperedges():
-      # each hyper edge
-      he_src = self.hg.get_hyperedge_sources(he)
-      he_dsts = self.hg.get_hyperedge_targets(he)
-
-      assert(len(he_src) == 1)
-      assert(len(he_dsts) != 0)
-      he_src = he_src[0]
-
-      if he_src in self.exclude_part_ids:
-        continue
-
-      if True in set(map(lambda x: x in self.exclude_part_ids, he_dsts)):
-        continue
-
-
-      # for he_dst in he_dsts:
-      if len(he_dsts) != 1:
-        continue
-
-
-      he_src_level = self.hg.node_to_level[he_src]
-      he_dsts_levels = list(map(lambda x: self.hg.node_to_level[x], he_dsts))
-
-      if not all(map(lambda x: x == he_src_level + 1, he_dsts_levels)):
-        continue
-
-      # can be considered to merge
-      merge_queue.append((he_src, he_dsts))
-
-    # try merge more parts
-    merge_queue.sort(key = lambda pids: len(pids[1]))
-    # merge parts from longest path
-    merge_queue.sort(key = lambda pids: self.hg.node_to_level[pids[0]], reverse=True)
-
-    print(f" {len(merge_queue)} pending merges")
-    for pa, pbs in merge_queue:
-      # merge if all parts has not been merged
-      if pa in self.node_id_to_part and all(map(lambda x: x in self.node_id_to_part, pbs)):
-        merge_ok = self.try_merge_upart_nodes(pa, pbs)
-        if merge_ok:
-          merge_cnt += 1
-    self.hg.graph_gc()
-
-
-    assert(len(self.node_id_to_part) == len(self.hg.all_nodes()))
-    self.hg.check_graph()
-
-    return merge_cnt
-  
-
-  def merge_adjacent_group_2(self):
+  def merge_adjacent_group(self):
     self.check_hg()
 
     total_merge_cnt = 0
@@ -791,162 +732,6 @@ class PartitionMerger:
         # print(f"Merged {merge_cnt} times. Keep working on level {iter_start_level}")
     return total_merge_cnt
 
-
-
-  def merge_adjacent_group(self):
-
-    self.check_hg()
-
-    merge_cnt = 0
-
-    merge_queue = []
-
-
-    assert(len(self.hg.levels) != 0)
-
-    for level_id, level_nodes in enumerate(self.hg.levels):
-      # merge each level to next level
-      # if level_id % 2 == 1:
-      #   continue
-
-      nodes_visited = set()
-
-      for each_node in level_nodes:
-        if each_node in nodes_visited or each_node in self.exclude_part_ids:
-          continue
-
-        childs = self.hg.get_node_successors(each_node)
-        childs_next_level = set(filter(lambda x: self.hg.node_to_level[x] == level_id + 1, childs))
-
-        if len(childs_next_level) == 0:
-          continue
-
-        child_all_predecessors = set()
-        for c in childs_next_level:
-          child_all_predecessors.update(self.hg.get_node_predecessors(c))
-        
-        child_all_predecessors_this_level = set(filter(lambda x: self.hg.node_to_level[x] == level_id, child_all_predecessors))
-        
-        assert(len(child_all_predecessors_this_level) != 0)
-        assert(each_node in child_all_predecessors_this_level)
-
-        # nodes if merge. Even they cannot be merged, they don't need to be visited again
-        new_part_vtxes = set()
-        new_part_vtxes.update(childs_next_level)
-        new_part_vtxes.update(child_all_predecessors_this_level)
-        nodes_visited.update(new_part_vtxes)
-
-
-        if not new_part_vtxes.isdisjoint(self.exclude_part_ids):
-          continue
-
-
-        # is self contained part?
-        # self contained: No fan out until last level
-        # child_all_predecessors_successors = set()
-        # for n in child_all_predecessors:
-        #   child_all_predecessors_successors.update(self.hg.get_node_successors(n))
-        
-        # if child_all_predecessors_successors == childs:
-          # is self contained. do merge
-        new_part_vtxes.remove(each_node)
-        merge_queue.append((each_node, new_part_vtxes))
-
-
-    # # try merge more parts
-    # merge_queue.sort(key = lambda pids: len(pids[1]))
-    # merge parts from longest path
-    # merge_queue.sort(key = lambda pids: self.hg.node_to_level[pids[0]], reverse=True)
-
-
-    print(f" {len(merge_queue)} pending merges")
-    
-    for pa, pbs in merge_queue:
-      # merge if all parts has not been merged
-      if pa in self.node_id_to_part and all(map(lambda x: x in self.node_id_to_part, pbs)):
-        # assert(self.exclude_part_ids == exclude_part_ids_old)
-        assert(pa not in self.exclude_part_ids)
-        assert(pbs.isdisjoint(self.exclude_part_ids))
-        merge_ok = self.try_merge_upart_nodes(pa, pbs, True)
-        if merge_ok:
-          merge_cnt += 1
-
-          if merge_cnt % 200 == 0:
-            self.hg.levelize()
-    self.hg.graph_gc()
-
-
-    assert(len(self.node_id_to_part) == len(self.hg.all_nodes()))
-    self.hg.check_graph()
-
-    return merge_cnt
-
-
-  def merge_on_critical_path(self):
-
-
-    self.check_hg()
-
-
-    # collect all nodes on critical path
-    # print("Collecting critical path nodes")
-    critical_path_nodes = set(self.hg.levels[-1])
-    fringe = critical_path_nodes.copy()
-    while len(fringe) != 0:
-      fringe_next = set()
-      for n in fringe:
-        fringe_next.update(self.hg.get_node_predecessors(n))
-      fringe_next.difference_update(critical_path_nodes)
-      critical_path_nodes.update(fringe_next)
-      fringe = fringe_next
-
-    current_level = 0
-    # max_level = len(self.hg.levels) - 1
-    total_merge_cnt = 0
-
-    while current_level < len(self.hg.levels) - 1:
-
-      print(f"New iter on level {current_level}")
-
-
-      fringe = set()
-      for n in self.hg.levels[current_level + 1]:
-        if n in critical_path_nodes:
-          fringe.add(n)
-
-      # fringe = list(filter(lambda x: x in critical_path_nodes, self.hg.levels[current_level + 1]))
-      
-      if (len(fringe) == 0):
-        print("Empty level on critical path? skip to next")
-        current_level += 1
-        continue
-
-      merge_cnt = 0
-      for n in fringe:
-        predecessors = set(self.hg.get_node_predecessors(n))
-        if predecessors.isdisjoint(self.exclude_part_ids):
-          from_nodes = predecessors.copy()
-          to_node = from_nodes.pop()
-          from_nodes.add(n)
-          all_nodes = set()
-          all_nodes.add(to_node)
-          all_nodes.update(from_nodes)
-          if  all(map(lambda x: x not in self.exclude_part_ids, all_nodes)) and all(map(lambda x: x in self.node_id_to_part, all_nodes)):
-            success = self.try_merge_upart_nodes(to_node, from_nodes, True)
-            if success:
-              # print("yey")
-              merge_cnt += 1
-      if merge_cnt != 0:
-        # succesfully do some merge
-        total_merge_cnt += merge_cnt
-        print(f"Merge {merge_cnt}")
-        self.hg.graph_gc()
-        self.hg.levelize()
-      else:
-        # Move to next level
-        current_level += 1
-        print(f"Move to level {current_level}")
-    return total_merge_cnt
 
   def merge_siblings(self):
 
@@ -1126,22 +911,10 @@ if __name__ == "__main__":
   merger.print_part_stat()
 
 
-  # while True:
-  #   print("> Merge with multiple childs")
-  #   merge_cnt = merger.merge_direct_childs()
-  #   print(f"{merge_cnt} merge ops")
-
-  #   # re levelize
-  #   merger.hg.levelize()
-  #   if merge_cnt == 0:
-  #     break
-
-  # merger.print_part_stat()
-
 
   while True:
     print("> Merge adjacent groups")
-    merge_cnt = merger.merge_adjacent_group_2()
+    merge_cnt = merger.merge_adjacent_group()
     print(f"{merge_cnt} merge ops")
 
     # re levelize
@@ -1151,34 +924,6 @@ if __name__ == "__main__":
 
   merger.print_part_stat()
 
-
-
-  # while True:
-  #   print("> Merge adjacent groups")
-  #   merge_cnt = merger.merge_adjacent_group()
-  #   print(f"{merge_cnt} merge ops")
-
-  #   # re levelize
-  #   merger.hg.levelize()
-  #   if merge_cnt == 0:
-  #     break
-
-  # merger.print_part_stat()
-
-
-
-
-  # while True:
-  #   print("> Merge critical path")
-  #   merge_cnt = merger.merge_on_critical_path()
-  #   print(f"{merge_cnt} merge ops")
-
-  #   # re levelize
-  #   merger.hg.levelize()
-  #   if merge_cnt == 0:
-  #     break
-
-  # merger.print_part_stat()
 
 
 
@@ -1210,7 +955,7 @@ if __name__ == "__main__":
 
   while True:
     print("> Merge adjacent groups2")
-    merge_cnt = merger.merge_adjacent_group_2()
+    merge_cnt = merger.merge_adjacent_group()
     print(f"{merge_cnt} merge ops")
 
     # re levelize
