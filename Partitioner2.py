@@ -3,7 +3,7 @@ import ToucanGraph
 import MergeAddMul
 import Utils
 
-import HyperGraph
+import MergeGraph
 import statistics
 
 
@@ -419,7 +419,7 @@ def partitioner2(G, excluded_nodes: set):
 
 class PartitionMerger:
   def __init__(self, G, exclude_nodes):
-    self.hg = None
+    self.mg = None
     self.G = G
     self.g = G.graph
     self.exclude_nodes = exclude_nodes
@@ -429,18 +429,18 @@ class PartitionMerger:
 
 
 
-  def build_part_hg(self, parts):
-    hg = HyperGraph.DirectedHyperGraph()
+  def build_part_mg(self, parts):
+    mg = MergeGraph.MergeGraph()
 
     # add nodes for all parts
     for i, p in enumerate(parts):
-      part_id = hg.add_node()
+      part_id = mg.add_node()
       assert(part_id == i)
       self.node_id_to_part[part_id] = p
 
     # add exclude parts
     for n in self.exclude_nodes:
-      part_id = hg.add_node()
+      part_id = mg.add_node()
 
       self.exclude_part_ids.add(part_id)
       self.node_id_to_part[part_id] = set({n})
@@ -467,7 +467,7 @@ class PartitionMerger:
           assert(n not in node_id_to_part_id)
           node_id_to_part_id[n] = part_id
     
-    # build hyper edges
+    # build edges
     for part_id, part in self.node_id_to_part.items():
       part_output_edges = []
 
@@ -486,30 +486,24 @@ class PartitionMerger:
               # an edge that points to outside current part
               part_output_edges.append(out_edge)
 
-      new_he = {}
+      new_edges = []
       for eachEdge in part_output_edges:
         src, dst = eachEdge
-        srcPart = node_id_to_part_id[src]
-        dstPart = node_id_to_part_id[dst]
-        if srcPart not in new_he:
-          new_he[srcPart] = set()
-        new_he[srcPart].add(dstPart)
-      
-      # We only need the dep relationship. Each he only represents dependency exists
-      # thus a part should only produce at most 1 hyperedge
-      assert(len(new_he) <= 1)
+        src_part_id = node_id_to_part_id[src]
+        dst_part_id = node_id_to_part_id[dst]
+        assert(src_part_id == part_id)
+        new_edges.append((src_part_id, dst_part_id))
 
-      for src, dsts in new_he.items():
-        # print(f"Add he from {src} to {str(dsts)}")
-        hg.add_hyperedge(src, dsts)
+      mg.add_edges(new_edges)
 
-    self.hg = hg
+
+    self.mg = mg
 
 
   def print_part_stat(self):
-    self.hg.levelize()
+    self.mg.levelize()
 
-    max_levels = len(self.hg.levels)
+    max_levels = len(self.mg.levels)
     
     norm_part_size = []
     norm_part_depth = []
@@ -545,15 +539,15 @@ class PartitionMerger:
     all_nodes = set([to, *from_nodes])
 
     if check_acyclic:
-      is_acyclic = self.hg.merge_is_acyclic(all_nodes)
+      is_acyclic = self.mg.merge_is_acyclic(all_nodes)
       if not is_acyclic:
         return False
     else:
-      assert(self.hg.merge_is_acyclic(all_nodes))
+      assert(self.mg.merge_is_acyclic(all_nodes))
 
     for n in all_nodes:
       assert(n in self.node_id_to_part)
-      assert(n in self.hg.graph.nodes())
+      assert(n in self.mg.graph.nodes())
       assert(n not in self.exclude_part_ids)
       assert(isinstance(self.node_id_to_part[n], MicroPartition))
 
@@ -574,37 +568,34 @@ class PartitionMerger:
     self.node_id_to_part[to] = new_part
 
 
-    self.hg.merge_nodes(to, from_nodes)
+    self.mg.merge_nodes(to, from_nodes)
 
     for n in from_nodes:
       del self.node_id_to_part[n]
-      # assert(n not in self.hg.graph.nodes())
+      # assert(n not in self.mg.graph.nodes())
 
     return True
 
 
-
-  def check_hg(self):
-    for n in self.hg.all_nodes():
-      assert(self.hg.graph.out_degree(n) <= 1)
+  def check_mg(self):
+    for n in self.mg.graph.nodes():
       if isinstance(self.node_id_to_part[n], MicroPartition):
         assert(self.node_id_to_part[n].max_live_vars is not None)
 
-    for he in self.hg.all_hyperedges():
-      assert(len(self.hg.get_hyperedge_sources(he)) == 1)
+    self.mg.check_graph()
 
   def merge_direct_child(self):
 
-    self.check_hg()
+    self.check_mg()
 
     merge_cnt = 0
 
     merge_queue = []
 
-    # for he in self.hg.all_hyperedges():
-    for n in self.hg.all_nodes():
+    # for he in self.mg.all_hyperedges():
+    for n in self.mg.graph.nodes():
       merge_to = n
-      merge_froms = list(self.hg.get_node_successors(n))
+      merge_froms = list(self.mg.get_node_successors(n))
 
 
       if merge_to in self.exclude_part_ids:
@@ -620,8 +611,8 @@ class PartitionMerger:
 
 
       merge_from = merge_froms[0]
-      merge_to_level = self.hg.node_to_level[merge_to]
-      merge_from_level = self.hg.node_to_level[merge_from]
+      merge_to_level = self.mg.node_to_level[merge_to]
+      merge_from_level = self.mg.node_to_level[merge_from]
 
       if merge_from in self.exclude_part_ids:
         continue
@@ -636,7 +627,7 @@ class PartitionMerger:
     # merge parts from small child to large
     merge_queue.sort(key = lambda pids: len(self.node_id_to_part[pids[1]].nodes))
     # merge parts from longest path
-    merge_queue.sort(key = lambda pids: self.hg.node_to_level[pids[1]], reverse=True)
+    merge_queue.sort(key = lambda pids: self.mg.node_to_level[pids[1]], reverse=True)
 
     print(f" {len(merge_queue)} pending merges")
     for pa, pb in merge_queue:
@@ -646,29 +637,29 @@ class PartitionMerger:
         merge_ok = self.try_merge_upart_nodes(pa, [pb])
         if merge_ok:
           merge_cnt += 1
-    self.hg.graph_gc()
+    self.mg.graph_gc()
 
 
-    assert(len(self.node_id_to_part) == len(self.hg.all_nodes()))
-    self.hg.check_graph()
+    assert(len(self.node_id_to_part) == len(self.mg.graph.nodes()))
+    self.mg.check_graph()
 
     return merge_cnt
 
 
   def merge_adjacent_group(self):
-    self.check_hg()
+    self.check_mg()
 
     total_merge_cnt = 0
 
 
     iter_start_level = 0
 
-    while len(self.hg.levels) > iter_start_level + 1:
+    while len(self.mg.levels) > iter_start_level + 1:
       merge_cnt = 0
 
 
       level_id = iter_start_level
-      level_nodes = self.hg.levels[level_id]
+      level_nodes = self.mg.levels[level_id]
 
 
 
@@ -679,17 +670,17 @@ class PartitionMerger:
         if each_node in nodes_visited or each_node in self.exclude_part_ids:
           continue
 
-        childs = self.hg.get_node_successors(each_node)
-        childs_next_level = set(filter(lambda x: self.hg.node_to_level[x] == level_id + 1, childs))
+        childs = self.mg.get_node_successors(each_node)
+        childs_next_level = set(filter(lambda x: self.mg.node_to_level[x] == level_id + 1, childs))
 
         if len(childs_next_level) == 0:
           continue
 
         child_all_predecessors = set()
         for c in childs_next_level:
-          child_all_predecessors.update(self.hg.get_node_predecessors(c))
+          child_all_predecessors.update(self.mg.get_node_predecessors(c))
         
-        child_all_predecessors_this_level = set(filter(lambda x: self.hg.node_to_level[x] == level_id, child_all_predecessors))
+        child_all_predecessors_this_level = set(filter(lambda x: self.mg.node_to_level[x] == level_id, child_all_predecessors))
         
         assert(len(child_all_predecessors_this_level) != 0)
         assert(each_node in child_all_predecessors_this_level)
@@ -720,8 +711,8 @@ class PartitionMerger:
           if merge_ok:
             merge_cnt += 1
 
-      self.hg.graph_gc()
-      self.hg.levelize()
+      self.mg.graph_gc()
+      self.mg.levelize()
 
 
       if merge_cnt == 0:
@@ -737,7 +728,7 @@ class PartitionMerger:
 
   def merge_siblings(self):
 
-    self.check_hg()
+    self.check_mg()
 
 
     merge_queue = []
@@ -748,14 +739,14 @@ class PartitionMerger:
 
     nodes_no_feasible_merge = set()
 
-    while len(self.hg.levels) > current_level + 1:
+    while len(self.mg.levels) > current_level + 1:
       merge_cnt = 0
 
-      for n in self.hg.levels[current_level]:
+      for n in self.mg.levels[current_level]:
         if n in nodes_no_feasible_merge:
           continue
 
-        successors = list(filter(lambda x: x not in self.exclude_part_ids and self.hg.node_to_level[x] == current_level + 1, self.hg.get_node_successors(n)))
+        successors = list(filter(lambda x: x not in self.exclude_part_ids and self.mg.node_to_level[x] == current_level + 1, self.mg.get_node_successors(n)))
 
         successors.sort(key = lambda x: self.node_id_to_part[x].max_live_vars)
 
@@ -785,9 +776,9 @@ class PartitionMerger:
           succ = self.try_merge_upart_nodes(to, from_nodes, True)
 
           if succ:
-            # self.hg.graph_gc()
-            # self.hg.levelize()
-            # self.hg.check_graph()
+            # self.mg.graph_gc()
+            # self.mg.levelize()
+            # self.mg.check_graph()
             # print(f"Succesfully merge {len(successors)} nodes")
             merge_cnt += 1
             break
@@ -802,13 +793,13 @@ class PartitionMerger:
         nodes_no_feasible_merge.clear()
         # print(f"Move to level {current_level}")
 
-        self.hg.graph_gc()
-        self.hg.levelize()
+        self.mg.graph_gc()
+        self.mg.levelize()
     return total_merge_cnt
   
 
   def merge_same_level(self):
-    self.check_hg()
+    self.check_mg()
 
 
     total_merge_cnt = 0
@@ -817,11 +808,11 @@ class PartitionMerger:
 
     # nodes_no_feasible_merge = set()
 
-    while len(self.hg.levels) > current_level + 1:
+    while len(self.mg.levels) > current_level + 1:
       merge_cnt = 0
 
 
-      nodes_valid = list(filter(lambda x: x in self.node_id_to_part and x not in self.exclude_part_ids, self.hg.levels[current_level]))
+      nodes_valid = list(filter(lambda x: x in self.node_id_to_part and x not in self.exclude_part_ids, self.mg.levels[current_level]))
 
       for n in nodes_valid:
         if not isinstance(self.node_id_to_part[n], MicroPartition):
@@ -853,8 +844,8 @@ class PartitionMerger:
         current_level += 1
         # print(f"Move to level {current_level}")
 
-        self.hg.graph_gc()
-        self.hg.levelize()
+        self.mg.graph_gc()
+        self.mg.levelize()
     return total_merge_cnt
   
 
@@ -885,7 +876,7 @@ if __name__ == "__main__":
   merger = PartitionMerger(g, exclude_nodes)
 
   print("> Build part graph after initial partitioning")
-  merger.build_part_hg(parts)
+  merger.build_part_mg(parts)
 
   merger.print_part_stat()
 
@@ -896,7 +887,7 @@ if __name__ == "__main__":
   print(f"Merged {merge_cnt} parts")
 
   # re levelize
-  merger.hg.levelize()
+  merger.mg.levelize()
   
   merger.print_part_stat()
 
@@ -906,7 +897,7 @@ if __name__ == "__main__":
     print(f"Merged {merge_cnt} parts")
 
     # re levelize
-    merger.hg.levelize()
+    merger.mg.levelize()
     if merge_cnt < 10:
       break
 
@@ -920,7 +911,7 @@ if __name__ == "__main__":
     print(f"{merge_cnt} merge ops")
 
     # re levelize
-    merger.hg.levelize()
+    merger.mg.levelize()
     if merge_cnt == 0:
       break
 
@@ -935,7 +926,7 @@ if __name__ == "__main__":
     print(f"{merge_cnt} merge ops")
 
     # re levelize
-    merger.hg.levelize()
+    merger.mg.levelize()
     if merge_cnt == 0:
       break
 
@@ -949,7 +940,7 @@ if __name__ == "__main__":
     print(f"Merged {merge_cnt} parts")
 
     # re levelize
-    merger.hg.levelize()
+    merger.mg.levelize()
     if merge_cnt < 10:
       break
 
@@ -961,7 +952,7 @@ if __name__ == "__main__":
     print(f"{merge_cnt} merge ops")
 
     # re levelize
-    merger.hg.levelize()
+    merger.mg.levelize()
     if merge_cnt == 0:
       break
 
@@ -975,7 +966,7 @@ if __name__ == "__main__":
     print(f"{merge_cnt} merge ops")
 
     # re levelize
-    merger.hg.levelize()
+    merger.mg.levelize()
     if merge_cnt == 0:
       break
 
