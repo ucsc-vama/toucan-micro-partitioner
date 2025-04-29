@@ -1,6 +1,7 @@
+import argparse
 
 import ToucanGraph
-import MergeAddMul
+# import MergeAddMul
 import Utils
 
 import MergeGraph
@@ -13,10 +14,40 @@ import copy
 DEBUG = True
 
 
-def find_exclude_nodes(g: nx.DiGraph):
-  exclude_node_tags = ['VecRead', 'VecOp', 'VecDecl', "MemRead", "MemWrite"]
+valid_node_tags = set([
+  "ConstDecl",
+  "RegRead",
+  "MemRead",
+  "VecDecl",
+  "VecRead",
+  "LUT",
+  "VecArith",
+  "VecLogic",
+  "Print",
+  "Stop",
+  "RegWrite",
+  "MemWrite"
+])
 
-  error_node_tags = ["ConstDecl"]
+exclude_node_tags = set([
+  "ConstDecl",
+  "RegRead",
+  "MemRead",
+  "VecDecl",
+  "VecRead",
+  # "LUT",
+  "VecArith",
+  "VecLogic",
+  "Print",
+  "Stop",
+  "RegWrite",
+  "MemWrite"
+])
+# exclude_node_tags = ['VecRead', 'VecOp', 'VecDecl', "MemRead", "MemWrite"]
+
+group_node_tags = []
+
+def find_exclude_nodes(g: nx.DiGraph):
 
   ret = []
   for node, attrs in g.nodes(data=True):
@@ -28,8 +59,10 @@ def find_exclude_nodes(g: nx.DiGraph):
     if tagValue in exclude_node_tags:
       ret.append(node)
 
-    assert(tagValue not in error_node_tags)
-  return ret
+    if tagValue not in valid_node_tags:
+      print(tagValue)
+    assert(tagValue in valid_node_tags)
+  return set(ret)
   
  
 def print_part_and_level(g, part):
@@ -853,10 +886,21 @@ class PartitionMerger:
 
 
 
+def parse_args():
+  parser = argparse.ArgumentParser(description="Micro partitioner for toucan.")
+  parser.add_argument('--input', required=True, type=str, help='Input file name')
+  parser.add_argument('--output', required=True, type=str, help='Output file name')
+  return parser.parse_args()
+
 if __name__ == "__main__":
   import time
-    
-  g = MergeAddMul.test_graph()
+
+  args = parse_args()
+
+  g = ToucanGraph.ToucanGraph()
+  g.load(args.input)
+
+
 
   exclude_nodes = find_exclude_nodes(g.graph)
   print(f"{len(exclude_nodes)} nodes need to be excluded")
@@ -864,6 +908,7 @@ if __name__ == "__main__":
   print("> partitioning")
   parts = partitioner2(g, exclude_nodes)
   print(f"Found {len(parts)} partitions")
+
 
 
   # report_part_info(parts)
@@ -958,7 +1003,17 @@ if __name__ == "__main__":
 
   merger.print_part_stat()
 
+  while True:
+    print("> Merge siblings")
+    merge_cnt = merger.merge_siblings()
+    print(f"{merge_cnt} merge ops")
 
+    # re levelize
+    merger.mg.levelize()
+    if merge_cnt == 0:
+      break
+
+  merger.print_part_stat()
 
   while True:
     print("> Merge same level")
