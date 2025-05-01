@@ -12,6 +12,8 @@ class ToucanGraph:
       raise TypeError("graph must be an instance of networkx.DiGraph")
 
     self.levels = []  # List of lists to store nodes at each level
+    self.nop_to_vecdecl = {} # Map of new Vecdecl NOP to original VecDecl
+    self.next_node_id = 0
 
   def load(self, file_path: str) -> None:
     """Load a graph from a text file in the described format."""
@@ -25,6 +27,8 @@ class ToucanGraph:
 
       for node_id, line in enumerate(file):
         node_id = int(node_id)
+        assert(node_id == self.next_node_id)
+        self.next_node_id += 1
         parts = line.strip().split()
         if len(parts) < 2:
           raise ValueError(f"Node {node_id} is missing weight or neighbors.")
@@ -39,34 +43,10 @@ class ToucanGraph:
         if weight < 0:
           continue
 
-        # Parse label into OpName, LUTName, and MulId/AddId
-        label_parts = label.split('-')
-        if len(label_parts) > 3:
-          raise ValueError(f"Node {node_id} has an invalid label format: {label}")
-        assert(len(label_parts) > 0)
-
-        op_name = label_parts[0]
-        lut_name = label_parts[1] if len(label_parts) > 1 else None
-        id_part = label_parts[2] if len(label_parts) > 2 else None
-        mul_id = id_part if id_part and id_part.startswith('m') else None
-        add_id = id_part if id_part and id_part.startswith('a') else None
-
-        if mul_id is not None:
-          assert(mul_id[0] == 'm')
-          mul_id = int(mul_id[1:])
-
-        if add_id is not None:
-          assert(add_id[0] == 'a')
-          add_id = int(add_id[1:])
-
         # Collect node information
         nodes_to_add.append((node_id, {
           "label": label,
-          "weight": weight,
-          "op_name": op_name,
-          "lut_name": lut_name,
-          "mul_id": mul_id,
-          "add_id": add_id
+          "weight": weight
         }))
 
         # Collect edges information
@@ -121,20 +101,76 @@ class ToucanGraph:
     level_info = f" and {len(self.levels)} levels" if self.levels else ""
     return f"Graph with {self.graph.number_of_nodes()} nodes and {self.graph.number_of_edges()} edges{level_info}."
 
-  def findAllNodesWithTag(self, tagName):
-    """Find all nodes with a specific tagName and return a dict with tagValue as the key."""
-    result = {}
-    for node, attrs in self.graph.nodes(data=True):
-      tagValue = attrs.get(tagName)
-      if tagValue != None:
-        if tagValue not in result:
-          result[tagValue] = []
-        result[tagValue].append(node)
-    return result
+  # def findAllNodesWithTag(self, tagName):
+  #   """Find all nodes with a specific tagName and return a dict with tagValue as the key."""
+  #   result = {}
+  #   for node, attrs in self.graph.nodes(data=True):
+  #     tagValue = attrs.get(tagName)
+  #     if tagValue != None:
+  #       if tagValue not in result:
+  #         result[tagValue] = []
+  #       result[tagValue].append(node)
+  #   return result
   
   def is_acyclic(self) -> bool:
     """Check if the graph is acyclic."""
     return nx.is_directed_acyclic_graph(self.graph)
+  
+  def expand_VecDecl(self, vecDeclElements: dict):
+    vecDecl_node_ids = []
+    nodes_to_remove = []
+
+    for node, attrs in self.graph.nodes(data=True):
+      tagValue = attrs.get("label")
+      if tagValue == "VecDecl":
+        node_weight = attrs.get("weight")
+        vecDecl_node_ids.append((node, node_weight))
+        nodes_to_remove.append(node)
+    print(len(vecDecl_node_ids))
+
+    for node, weight in vecDecl_node_ids:
+      vec_input_nodes = list(self.graph.predecessors(node))
+      vec_user_nodes = list(self.graph.successors(node))
+
+      # Vec info file should be consistant with graph info
+      assert(node in vecDeclElements)
+
+      vec_element_op_ids = vecDeclElements[node]
+
+      # At least one vecDecl element
+      assert(weight > 0)
+      # should also be consistant
+      assert(weight == len(vec_element_op_ids))
+      assert(len(vec_input_nodes) <= weight)
+
+      nodes_to_add = []
+      edges_to_add = []
+      for i in range(0, weight):
+        # insert NOP
+        node_id = self.next_node_id
+        self.next_node_id += 1
+        assert(node_id not in self.graph.nodes())
+
+        nodes_to_add.append((node_id, {
+          "label": "VecDecl_LUT_NOP",
+          "weight": 1,
+          "original_vec_decl": node
+        }))
+
+        edge_src = vec_element_op_ids[i]
+        assert(edge_src in vec_input_nodes)
+        for d in vec_user_nodes:
+          edges_to_add.append((edge_src, node_id))
+          edges_to_add.append((node_id, d))
+
+      self.graph.add_nodes_from(nodes_to_add)
+      self.graph.add_edges_from(edges_to_add)
+    assert(len(nodes_to_remove) == len(vecDeclElements))
+    self.graph.remove_nodes_from(nodes_to_remove)
+
+
+
+
   
   # def merge_nodes(self, nodes_to_merge, new_node_attributes=None):
   #   """Merge multiple nodes into a single node.

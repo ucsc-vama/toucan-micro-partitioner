@@ -1,7 +1,6 @@
 import argparse
 
 import ToucanGraph
-# import MergeAddMul
 import Utils
 
 import MergeGraph
@@ -9,7 +8,6 @@ import statistics
 
 
 import networkx as nx
-import copy
 
 DEBUG = True
 
@@ -19,6 +17,7 @@ valid_node_tags = set([
   "RegRead",
   "MemRead",
   "VecDecl",
+  "VecDecl_LUT_NOP",
   "VecRead",
   "LUT",
   "VecArith",
@@ -34,6 +33,7 @@ exclude_node_tags = set([
   "RegRead",
   "MemRead",
   "VecDecl",
+  # "VecDecl_LUT_NOP",
   "VecRead",
   # "LUT",
   "VecArith",
@@ -45,13 +45,15 @@ exclude_node_tags = set([
 ])
 # exclude_node_tags = ['VecRead', 'VecOp', 'VecDecl', "MemRead", "MemWrite"]
 
+# TODO: Expand VecDecl to NOP, allow
+
 group_node_tags = []
 
 def find_exclude_nodes(g: nx.DiGraph):
 
   ret = []
   for node, attrs in g.nodes(data=True):
-    tagValue = attrs.get("op_name")
+    tagValue = attrs.get("label")
 
     # Note: tagValue could be None for inserted dummy nodes
     # assert(tagValue is not None)
@@ -126,8 +128,6 @@ PART_MAX_LEVEL = 9999
 
 
 
-
-from collections import defaultdict
 
 class MicroPartition:
   def __init__(self, G, excluded_nodes=None):
@@ -356,7 +356,7 @@ def partitioner2(G, excluded_nodes: set):
       continue
 
     seed_in_degree = len(g.in_edges(seed))
-    seed_opname = g.nodes[seed]['op_name']
+    seed_opname = g.nodes[seed]['label']
     node_should_exclude = seed_in_degree > 3
     if node_should_exclude:
       print(f"Node {seed} has more than 3 inputs. This node is a {seed_opname}")
@@ -881,6 +881,25 @@ class PartitionMerger:
         self.mg.levelize()
     return total_merge_cnt
   
+  def save(self, filename: str):
+    self.mg.levelize()
+
+    with open(filename, 'w') as out:
+      for level_id, level_nodes in enumerate(self.mg.levels):
+        # L: level
+        out.write(f"L {level_id}\n")
+
+        for pid in level_nodes:
+          part = self.node_id_to_part[pid]
+          if pid in self.exclude_part_ids:
+            # part is a set
+            assert(len(part) == 1)
+            # e: exclude part
+            out.write(f"e {part.pop()}\n")
+          else:
+            # n: normal part
+            assert(len(part.nodes) > 0)
+            out.write(f"n {' '.join(map(lambda x: str(x), part.nodes))}\n")
 
 
 
@@ -888,17 +907,41 @@ class PartitionMerger:
 
 def parse_args():
   parser = argparse.ArgumentParser(description="Micro partitioner for toucan.")
-  parser.add_argument('--input', required=True, type=str, help='Input file name')
+  parser.add_argument('--graph', required=True, type=str, help='Input graph file name')
+  parser.add_argument('--vector', required=True, type=str, help="Input Vector info")
   parser.add_argument('--output', required=True, type=str, help='Output file name')
   return parser.parse_args()
+
+def load_vec_info_file(filename):
+  ret = {}
+  with open(filename) as f:
+    for lineno, line in enumerate(f):
+      if lineno < 2:
+        continue
+      dat = list(map(lambda x: int(x), line.strip().split(' ')))
+      # a vector should have more than 1 elements
+
+      assert(len(dat) >= 2)
+      vecDecl_node_id = dat[0]
+      vecElem_ids = dat[1:]
+      assert(vecDecl_node_id not in ret)
+      ret[vecDecl_node_id] = vecElem_ids
+  return ret
+
+
+
 
 if __name__ == "__main__":
   import time
 
   args = parse_args()
 
+  vecDeclElementsInfo = load_vec_info_file(args.vector)
+
   g = ToucanGraph.ToucanGraph()
-  g.load(args.input)
+  g.load(args.graph)
+  g.expand_VecDecl(vecDeclElementsInfo)
+  # exit()
 
 
 
@@ -1028,4 +1071,6 @@ if __name__ == "__main__":
   merger.print_part_stat()
 
   print("> Done")
+
+  merger.save(args.output)
   Utils.print_memory_usage()
