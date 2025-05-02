@@ -45,8 +45,6 @@ exclude_node_tags = set([
 ])
 # exclude_node_tags = ['VecRead', 'VecOp', 'VecDecl', "MemRead", "MemWrite"]
 
-# TODO: Expand VecDecl to NOP, allow
-
 group_node_tags = []
 
 def find_exclude_nodes(g: nx.DiGraph):
