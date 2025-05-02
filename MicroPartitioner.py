@@ -887,17 +887,20 @@ class PartitionMerger:
         # L: level
         out.write(f"L {level_id}\n")
 
+        current_level_exclude_nodes = []
+
         for pid in level_nodes:
           part = self.node_id_to_part[pid]
           if pid in self.exclude_part_ids:
             # part is a set
             assert(len(part) == 1)
             # e: exclude part
-            out.write(f"e {part.pop()}\n")
+            current_level_exclude_nodes.append(part.pop())
           else:
             # n: normal part
             assert(len(part.nodes) > 0)
             out.write(f"n {' '.join(map(lambda x: str(x), part.nodes))}\n")
+        out.write(f"e {' '.join(map(lambda x: str(x), current_level_exclude_nodes))}\n")
 
 
 
