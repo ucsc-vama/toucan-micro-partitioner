@@ -900,7 +900,9 @@ class PartitionMerger:
             # n: normal part
             assert(len(part.nodes) > 0)
             out.write(f"n {' '.join(map(lambda x: str(x), part.nodes))}\n")
-        out.write(f"e {' '.join(map(lambda x: str(x), current_level_exclude_nodes))}\n")
+        # save exclude nodes if exists
+        if len(current_level_exclude_nodes) > 0:
+          out.write(f"e {' '.join(map(lambda x: str(x), current_level_exclude_nodes))}\n")
 
 
 

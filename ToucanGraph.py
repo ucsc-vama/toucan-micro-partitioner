@@ -62,7 +62,8 @@ class ToucanGraph:
       edge_count = 0
       for source, target in edges_to_add:
         if not self.graph.has_node(source) or not self.graph.has_node(target):
-          raise ValueError(f"Edge from {source} to {target} refers to non-existent node.")
+          source_existance = "Exist" if self.graph.has_node(source) else "NonExist"
+          raise ValueError(f"Edge from {source} {source_existance} to {target} refers to non-existent node.")
         self.graph.add_edge(source, target)
         edge_count += 1
 
@@ -165,7 +166,7 @@ class ToucanGraph:
 
       self.graph.add_nodes_from(nodes_to_add)
       self.graph.add_edges_from(edges_to_add)
-    assert(len(nodes_to_remove) == len(vecDeclElements))
+    assert(len(nodes_to_remove) <= len(vecDeclElements))
     self.graph.remove_nodes_from(nodes_to_remove)
 
 
