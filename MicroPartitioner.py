@@ -921,6 +921,7 @@ def parse_args():
   parser.add_argument('--graph', required=True, type=str, help='Input graph file name')
   parser.add_argument('--vector', required=True, type=str, help="Input Vector info")
   parser.add_argument('--output', required=True, type=str, help='Output file name')
+  parser.add_argument('--vecmap', required=True, type=str, help='Output vector mapping file name')
   return parser.parse_args()
 
 def load_vec_info_file(filename):
@@ -952,6 +953,7 @@ if __name__ == "__main__":
   g = ToucanGraph.ToucanGraph()
   g.load(args.graph)
   g.expand_VecDecl(vecDeclElementsInfo)
+  g.save_vector_def_info(args.vecmap)
   # exit()
 
 

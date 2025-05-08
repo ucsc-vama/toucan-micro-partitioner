@@ -12,7 +12,7 @@ class ToucanGraph:
       raise TypeError("graph must be an instance of networkx.DiGraph")
 
     self.levels = []  # List of lists to store nodes at each level
-    self.nop_to_vecdecl = {} # Map of new Vecdecl NOP to original VecDecl
+    self.vecdecl_to_nop = {} # Map of original VecDecl to new Vecdecl NOP
     self.next_node_id = 0
 
   def load(self, file_path: str) -> None:
@@ -146,6 +146,7 @@ class ToucanGraph:
 
       nodes_to_add = []
       edges_to_add = []
+      new_node_list = []
       for i in range(0, weight):
         # insert NOP
         node_id = self.next_node_id
@@ -157,6 +158,7 @@ class ToucanGraph:
           "weight": 1,
           "original_vec_decl": node
         }))
+        new_node_list.append(node_id)
 
         edge_src = vec_element_op_ids[i]
         assert(edge_src in vec_input_nodes)
@@ -164,10 +166,20 @@ class ToucanGraph:
           edges_to_add.append((edge_src, node_id))
           edges_to_add.append((node_id, d))
 
+      assert(node not in self.vecdecl_to_nop)
+      self.vecdecl_to_nop[node] = new_node_list
       self.graph.add_nodes_from(nodes_to_add)
       self.graph.add_edges_from(edges_to_add)
     assert(len(nodes_to_remove) <= len(vecDeclElements))
     self.graph.remove_nodes_from(nodes_to_remove)
+
+  def save_vector_def_info(self, filename: str):
+    with open(filename, 'w') as out:
+      for vecDecl_node, nop_list in self.vecdecl_to_nop.items():
+        line = [vecDecl_node]
+        line.extend(nop_list)
+        assert(len(nop_list) != 0)
+        out.write(' '.join(map(lambda x: str(x), line)))
 
 
 
