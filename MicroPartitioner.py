@@ -902,11 +902,11 @@ class PartitionMerger:
             assert(len(part.levels) > 0)
             assert(sum(map(lambda x: len(x), part.levels)) == len(part.nodes))
             # new normal part
-            out.write('n ')
+            out.write('n')
             for eachLevel in part.levels:
               assert(len(eachLevel) > 0)
               # Use letter 'l' as seperator for each level
-              out.write('l ' + ' '.join(map(lambda x: str(x), eachLevel)))
+              out.write(' l ' + ' '.join(map(lambda x: str(x), eachLevel)))
             out.write(f"\n")
         # save exclude nodes if exists
         if len(current_level_exclude_nodes) > 0:

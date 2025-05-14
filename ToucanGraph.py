@@ -24,6 +24,7 @@ class ToucanGraph:
 
       nodes_to_add = []
       edges_to_add = []
+      invalid_nodes = set()
 
       for node_id, line in enumerate(file):
         node_id = int(node_id)
@@ -41,6 +42,7 @@ class ToucanGraph:
 
         # Skip invalid nodes
         if weight < 0:
+          invalid_nodes.add(node_id)
           continue
 
         # Collect node information
@@ -61,6 +63,9 @@ class ToucanGraph:
       # Add all edges to the graph
       edge_count = 0
       for source, target in edges_to_add:
+        assert(source not in invalid_nodes)
+        if target in invalid_nodes:
+          continue
         if not self.graph.has_node(source) or not self.graph.has_node(target):
           source_existance = "Exist" if self.graph.has_node(source) else "NonExist"
           raise ValueError(f"Edge from {source} {source_existance} to {target} refers to non-existent node.")
@@ -180,6 +185,7 @@ class ToucanGraph:
         line.extend(nop_list)
         assert(len(nop_list) != 0)
         out.write(' '.join(map(lambda x: str(x), line)))
+        out.write("\n")
 
 
 
