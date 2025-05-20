@@ -953,6 +953,7 @@ if __name__ == "__main__":
   g = ToucanGraph.ToucanGraph()
   g.load(args.graph)
   g.expand_VecDecl(vecDeclElementsInfo)
+  g.remove_ConstDecl()
   g.save_vector_def_info(args.vecmap)
   # exit()
 

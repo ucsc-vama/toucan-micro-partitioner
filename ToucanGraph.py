@@ -178,6 +178,15 @@ class ToucanGraph:
     assert(len(nodes_to_remove) <= len(vecDeclElements))
     self.graph.remove_nodes_from(nodes_to_remove)
 
+  def remove_ConstDecl(self):
+    nodes_to_remove = []
+    for node, attrs in self.graph.nodes(data=True):
+      tagValue = attrs.get("label")
+      if tagValue == "ConstDecl":
+        nodes_to_remove.append(node)
+    print(f"Remove {len(nodes_to_remove)} ConstDecl nodes")
+    self.graph.remove_nodes_from(nodes_to_remove)
+
   def save_vector_def_info(self, filename: str):
     with open(filename, 'w') as out:
       for vecDecl_node, nop_list in self.vecdecl_to_nop.items():
