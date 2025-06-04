@@ -181,6 +181,16 @@ class MicroPartition:
       for n in ns:
         self.node_levels[n] = level_id
 
+  def _check_node_constraint(self):
+    assert(len(self.levels) != 0)
+    for el in self.levels:
+      totalOpCount = 0
+      for n in el:
+        opCount = self.G.nodes[n]['weight'] 
+        totalOpCount += opCount
+      if totalOpCount > GPU_WARP_SIZE:
+        return False
+    return True
 
   def _collect_variable_liveness(self):
     # Must run after levelize
@@ -198,6 +208,7 @@ class MicroPartition:
         if s not in self.nodes:
           # this edge points to outside of the part
           life_end = PART_MAX_LEVEL
+          break
         else:
           assert(self.node_levels[s] > life_start)
           life_end = max(life_end, self.node_levels[s])
@@ -207,9 +218,8 @@ class MicroPartition:
           self.var_life_cycle[node] = (life_start, life_end)
         else:
           # an existing var
-          old_start, old_end = self.var_life_cycle[node]
-          assert(old_start == life_start)
-          self.var_life_cycle[node] = (life_start, max(old_end, life_end))
+          # Should not happen as each result value should have only 1 writer
+          assert(False)
       else:
         # a sink node. Doesn't produce value. ignore
         pass
@@ -317,6 +327,9 @@ class MicroPartition:
     self._collect_variable_liveness()
     good = self._check_liveness_constraint()
 
+    good2 = self._check_node_constraint()
+    if good:
+      assert(good2)
     return good
 
   def try_add_nodes(self, new_nodes):
@@ -906,11 +919,11 @@ class PartitionMerger:
             for eachLevel in part.levels:
               assert(len(eachLevel) > 0)
               # Use letter 'l' as seperator for each level
-              out.write(' l ' + ' '.join(map(lambda x: str(x), eachLevel)))
+              out.write(' l ' + ' '.join(map(lambda x: str(x), sorted(eachLevel))))
             out.write(f"\n")
         # save exclude nodes if exists
         if len(current_level_exclude_nodes) > 0:
-          out.write(f"e {' '.join(map(lambda x: str(x), current_level_exclude_nodes))}\n")
+          out.write(f"e {' '.join(map(lambda x: str(x), sorted(current_level_exclude_nodes)))}\n")
 
 
 

@@ -13,32 +13,34 @@ class ToucanGraph:
 
     self.levels = []  # List of lists to store nodes at each level
     self.vecdecl_to_nop = {} # Map of original VecDecl to new Vecdecl NOP
-    self.next_node_id = 0
+    self.max_node_id = 0
 
   def load(self, file_path: str) -> None:
     """Load a graph from a text file in the described format."""
     with open(file_path, 'r') as file:
-      # Read the first line for number of edges and nodes
-      first_line = file.readline().strip()
-      num_edges, num_nodes = map(int, first_line.split())
+      for lineno, line in enumerate(file):
+        if lineno == 0:
+          # Read the first line for number of edges and nodes
+          first_line = line.strip()
+          num_edges, num_nodes = map(int, first_line.split())
 
-      nodes_to_add = []
-      edges_to_add = []
-      invalid_nodes = set()
+          nodes_to_add = []
+          edges_to_add = []
+          invalid_nodes = set()
+          continue
 
-      for node_id, line in enumerate(file):
-        node_id = int(node_id)
-        assert(node_id == self.next_node_id)
-        self.next_node_id += 1
+        
         parts = line.strip().split()
-        if len(parts) < 2:
+        node_id = int(parts[0])
+        self.max_node_id = max(node_id, self.max_node_id)
+        if len(parts) < 3:
           raise ValueError(f"Node {node_id} is missing weight or neighbors.")
 
-        label = parts[0]
+        label = parts[1]
         if not label:
           raise ValueError(f"Node {node_id} has an empty label, which is illegal.")
 
-        weight = int(parts[1])
+        weight = int(parts[2])
 
         # Skip invalid nodes
         if weight < 0:
@@ -52,8 +54,8 @@ class ToucanGraph:
         }))
 
         # Collect edges information
-        if len(parts) > 2:
-          neighbors = map(int, parts[2:])
+        if len(parts) > 3:
+          neighbors = map(int, parts[3:])
           for neighbor in neighbors:
             edges_to_add.append((node_id, neighbor))
 
@@ -68,7 +70,8 @@ class ToucanGraph:
           continue
         if not self.graph.has_node(source) or not self.graph.has_node(target):
           source_existance = "Exist" if self.graph.has_node(source) else "NonExist"
-          raise ValueError(f"Edge from {source} {source_existance} to {target} refers to non-existent node.")
+          target_existance = "Exist" if self.graph.has_node(source) else "NonExist"
+          raise ValueError(f"Line {lineno}: Edge from {source} ({source_existance}) to {target} ({target_existance}) refers to non-existent node.")
         self.graph.add_edge(source, target)
         edge_count += 1
 
@@ -154,8 +157,8 @@ class ToucanGraph:
       new_node_list = []
       for i in range(0, weight):
         # insert NOP
-        node_id = self.next_node_id
-        self.next_node_id += 1
+        self.max_node_id += 1
+        node_id = self.max_node_id
         assert(node_id not in self.graph.nodes())
 
         nodes_to_add.append((node_id, {
