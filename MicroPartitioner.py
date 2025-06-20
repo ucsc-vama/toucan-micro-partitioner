@@ -44,6 +44,7 @@ exclude_node_tags = set([
   "MemWrite"
 ])
 # exclude_node_tags = ['VecRead', 'VecOp', 'VecDecl', "MemRead", "MemWrite"]
+merge_result_node_labels = set(['VecArith', 'VecRead'])
 
 group_node_tags = []
 
@@ -222,12 +223,18 @@ class MicroPartition:
           assert(False)
       else:
         # a sink node. Doesn't produce value. ignore
-        pass
+        assert(False)
     
     # some input might coming from outside
+    vecArith_cnt = 0
     for node in self.nodes:
 
       for p in self.G.predecessors(node):
+        p_label = self.G.nodes[p].get('label', None)
+        if p_label in merge_result_node_labels:
+          # special handling for VecArith. Read from result of VecArith are considered as different values
+          p = f"{p}-{p_label}-{vecArith_cnt}"
+          vecArith_cnt += 1
         if p in self.nodes:
           assert(p in self.var_life_cycle)
         else:
@@ -319,6 +326,7 @@ class MicroPartition:
     if len(current_live_vars) > GPU_WARP_SIZE:
       return False
     
+    assert self.max_live_vars <= GPU_WARP_SIZE
     return True
 
   def check_correctness(self):
@@ -971,10 +979,9 @@ if __name__ == "__main__":
   # exit()
 
 
-
   exclude_nodes = find_exclude_nodes(g.graph)
   print(f"{len(exclude_nodes)} nodes need to be excluded")
-  
+
   print("> partitioning")
   parts = partitioner2(g, exclude_nodes)
   print(f"Found {len(parts)} partitions")
