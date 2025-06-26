@@ -257,4 +257,4 @@ if __name__ == "__main__":
   for node in g.levels[-1]:
     print(g.graph.nodes[node].get('label'))
 
-  Utils.print_memory_usage()
+  # Utils.print_memory_usage()

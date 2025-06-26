@@ -1,10 +1,10 @@
-import psutil
-import os
+# import psutil
+# import os
 
-def print_memory_usage():
-  process = psutil.Process(os.getpid())
-  memory_usage = process.memory_info().rss / (1024 ** 2)  # Convert bytes to MB
-  print(f"Memory usage: {memory_usage:.2f} MB")
+# def print_memory_usage():
+#   process = psutil.Process(os.getpid())
+#   memory_usage = process.memory_info().rss / (1024 ** 2)  # Convert bytes to MB
+#   print(f"Memory usage: {memory_usage:.2f} MB")
 
 
 def count_elements(lst):
@@ -14,5 +14,5 @@ def count_elements(lst):
   return counts
 
 
-if __name__ == "__main__":
-  print_memory_usage()
+# if __name__ == "__main__":
+#   print_memory_usage()

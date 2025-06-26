@@ -990,7 +990,7 @@ if __name__ == "__main__":
 
   # report_part_info(parts)
 
-  Utils.print_memory_usage()
+  # Utils.print_memory_usage()
 
 
   print("> Working on merge")
@@ -1107,4 +1107,4 @@ if __name__ == "__main__":
   print("> Done")
 
   merger.save(args.output)
-  Utils.print_memory_usage()
+  # Utils.print_memory_usage()
