@@ -66,18 +66,6 @@ def find_exclude_nodes(g: nx.DiGraph):
   return set(ret)
   
  
-def print_part_and_level(g, part):
-  p = {}
-  for n in part:
-    level = g.nodes[n]['level_id']
-    assert level is not None
-    if level not in p.keys():
-      p[level] = []
-    p[level].append(n)
-
-  for k in sorted(p.keys()):
-    v = map(lambda x: str(x), p[k])
-    print(f"Level {k}: {" ".join(v)}")
   
 
 def report_part_info(parts):
