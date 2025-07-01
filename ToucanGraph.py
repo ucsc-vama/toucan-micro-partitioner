@@ -149,13 +149,13 @@ class ToucanGraph:
       # At least one vecDecl element
       assert(weight > 0)
       # should also be consistant
-      assert(weight == len(vec_element_op_ids))
+      nop_node_weight = int(weight / len(vec_element_op_ids))
       assert(len(vec_input_nodes) <= weight)
 
       nodes_to_add = []
       edges_to_add = []
       new_node_list = []
-      for i in range(0, weight):
+      for i in range(0, len(vec_element_op_ids)):
         # insert NOP
         self.max_node_id += 1
         node_id = self.max_node_id
@@ -163,7 +163,7 @@ class ToucanGraph:
 
         nodes_to_add.append((node_id, {
           "label": "VecDecl_LUT_NOP",
-          "weight": 1,
+          "weight": nop_node_weight,
           "original_vec_decl": node
         }))
         new_node_list.append(node_id)

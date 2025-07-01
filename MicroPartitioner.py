@@ -182,16 +182,6 @@ class MicroPartition:
       for n in ns:
         self.node_levels[n] = level_id
 
-  def _check_node_constraint(self):
-    assert(len(self.levels) != 0)
-    for el in self.levels:
-      totalOpCount = 0
-      for n in el:
-        opCount = self.G.nodes[n]['weight'] 
-        totalOpCount += opCount
-      if totalOpCount > GPU_WARP_SIZE:
-        return False
-    return True
 
   def _collect_variable_liveness(self):
     # Must run after levelize
@@ -335,9 +325,6 @@ class MicroPartition:
     self._collect_variable_liveness()
     good = self._check_liveness_constraint()
 
-    good2 = self._check_node_constraint()
-    if good:
-      assert(good2)
     return good
 
   def try_add_nodes(self, new_nodes):
