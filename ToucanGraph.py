@@ -5,11 +5,11 @@ import networkx as nx
 class ToucanGraph:
   def __init__(self, graph=None):
     if graph is None:
-      self.graph = nx.DiGraph()  # Use directed graph, change to Graph() for undirected
-    elif isinstance(graph, nx.DiGraph):
+      self.graph = nx.MultiDiGraph()  # Use directed graph, change to Graph() for undirected
+    elif isinstance(graph, nx.MultiDiGraph):
       self.graph = graph.copy()
     else:
-      raise TypeError("graph must be an instance of networkx.DiGraph")
+      raise TypeError("graph must be an instance of networkx.MultiDiGraph")
 
     self.levels = []  # List of lists to store nodes at each level
     self.vecdecl_to_nop = {} # Map of original VecDecl to new Vecdecl NOP

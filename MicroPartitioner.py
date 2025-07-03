@@ -48,7 +48,7 @@ merge_result_node_labels = set(['VecArith', 'VecRead'])
 
 group_node_tags = []
 
-def find_exclude_nodes(g: nx.DiGraph):
+def find_exclude_nodes(g: nx.MultiDiGraph):
 
   ret = []
   for node, attrs in g.nodes(data=True):
@@ -207,8 +207,10 @@ class MicroPartition:
     vecArith_cnt = 0
     for node in self.nodes:
 
-      for p in self.G.predecessors(node):
+      for edge in self.G.in_edges(node):
+        p, _ = edge
         p_label = self.G.nodes[p].get('label', None)
+
         if p_label in merge_result_node_labels:
           # special handling for VecArith. Read from result of VecArith are considered as different values
           p = f"{p}-{p_label}-{vecArith_cnt}"
@@ -353,7 +355,7 @@ def partitioner2(G, excluded_nodes: set):
     seed_opname = g.nodes[seed]['label']
     node_should_exclude = seed_in_degree > 3
     if node_should_exclude:
-      print(f"Node {seed} has more than 3 inputs. This node is a {seed_opname}")
+      print(f"Node {seed} has more than 3 inputs ({seed_in_degree}). This node is a {seed_opname}")
     assert(not node_should_exclude)
 
 
