@@ -128,6 +128,7 @@ class ToucanGraph:
   def expand_VecDecl(self, vecDeclElements: dict):
     vecDecl_node_ids = []
     nodes_to_remove = []
+    num_new_nodes = 0
 
     for node, attrs in self.graph.nodes(data=True):
       tagValue = attrs.get("label")
@@ -135,7 +136,6 @@ class ToucanGraph:
         node_weight = attrs.get("weight")
         vecDecl_node_ids.append((node, node_weight))
         nodes_to_remove.append(node)
-    print(len(vecDecl_node_ids))
 
     for node, weight in vecDecl_node_ids:
       vec_input_nodes = list(self.graph.predecessors(node))
@@ -170,16 +170,22 @@ class ToucanGraph:
 
         edge_src = vec_element_op_ids[i]
         assert(edge_src in vec_input_nodes)
+        edges_to_add.append((edge_src, node_id))
         for d in vec_user_nodes:
-          edges_to_add.append((edge_src, node_id))
           edges_to_add.append((node_id, d))
 
       assert(node not in self.vecdecl_to_nop)
       self.vecdecl_to_nop[node] = new_node_list
       self.graph.add_nodes_from(nodes_to_add)
       self.graph.add_edges_from(edges_to_add)
+      num_new_nodes += len(nodes_to_add)
+
+      for new_node in nodes_to_add:
+        new_node_id = new_node[0]
+        assert(self.graph.in_degree(new_node_id) == 1)
     assert(len(nodes_to_remove) <= len(vecDeclElements))
     self.graph.remove_nodes_from(nodes_to_remove)
+    print(f"Expand {len(nodes_to_remove)} vectors, add {num_new_nodes} new VecDecl_LUT_NOP nodes")
 
   def remove_ConstDecl(self):
     nodes_to_remove = []
