@@ -10,7 +10,7 @@ import statistics
 import networkx as nx
 
 DEBUG = True
-
+MAX_PARTITION_SIZE = 99999
 
 valid_node_tags = set([
   "ConstDecl",
@@ -310,6 +310,8 @@ class MicroPartition:
     return True
 
   def check_correctness(self):
+    if len(self.nodes) > MAX_PARTITION_SIZE:
+      return False
     self.g = self.G.subgraph(self.nodes)
     self._calculate_node_level()
     self._collect_variable_liveness()
@@ -920,6 +922,7 @@ def parse_args():
   parser.add_argument('--vector', required=True, type=str, help="Input Vector info")
   parser.add_argument('--output', required=True, type=str, help='Output file name')
   parser.add_argument('--vecmap', required=True, type=str, help='Output vector mapping file name')
+  parser.add_argument('--max-part-size', required=False, type=int, default=99999, help="Max partition size")
   return parser.parse_args()
 
 def load_vec_info_file(filename):
@@ -945,6 +948,7 @@ if __name__ == "__main__":
   import time
 
   args = parse_args()
+  MAX_PARTITION_SIZE = args.max_part_size
 
   vecDeclElementsInfo = load_vec_info_file(args.vector)
 
