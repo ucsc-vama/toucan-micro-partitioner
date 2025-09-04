@@ -10,6 +10,7 @@ import statistics
 import networkx as nx
 
 DEBUG = True
+# DEBUG = False
 MAX_PARTITION_SIZE = 99999
 
 valid_node_tags = set([
@@ -574,7 +575,8 @@ class PartitionMerger:
       if not is_acyclic:
         return False
     else:
-      assert(self.mg.merge_is_acyclic(all_nodes))
+      if DEBUG:
+        assert(self.mg.merge_is_acyclic(all_nodes))
 
     for n in all_nodes:
       assert(n in self.node_id_to_part)
@@ -1073,17 +1075,17 @@ if __name__ == "__main__":
 
   merger.print_part_stat()
 
-  while True:
-    print("> Merge same level")
-    merge_cnt = merger.merge_same_level()
-    print(f"{merge_cnt} merge ops")
+  # while True:
+  #   print("> Merge same level")
+  #   merge_cnt = merger.merge_same_level()
+  #   print(f"{merge_cnt} merge ops")
 
-    # re levelize
-    merger.mg.levelize()
-    if merge_cnt == 0:
-      break
+  #   # re levelize
+  #   merger.mg.levelize()
+  #   if merge_cnt == 0:
+  #     break
 
-  merger.print_part_stat()
+  # merger.print_part_stat()
 
   print("> Done")
 
