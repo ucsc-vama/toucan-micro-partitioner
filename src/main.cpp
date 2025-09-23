@@ -46,13 +46,16 @@ int main(int argc, char* argv[]) {
         auto start_time = std::chrono::high_resolution_clock::now();
         
         Args args = parse_args(argc, argv);
-        
+
+        std::cout << "> Load graph\n";
         // Load vector information
         auto vecDeclElementsInfo = Utils::load_vec_info_file(args.vector);
         
         // Load and process graph
         ToucanGraph g;
         g.load(args.graph);
+
+        std::cout << "> Preprocessing & levelize\n";
         g.expand_VecDecl(vecDeclElementsInfo);
         g.remove_ConstDecl();
         g.save_vector_def_info(args.vecmap);

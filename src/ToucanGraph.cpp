@@ -147,7 +147,7 @@ void ToucanGraph::load(const std::string& file_path) {
     for (const auto& edge : edges_to_add) {
         int source = edge.first, target = edge.second;
         
-        if (invalid_nodes.count(source) || invalid_nodes.count(target)) {
+        if (invalid_nodes.contains(source) || invalid_nodes.contains(target)) {
             continue;
         }
         
@@ -364,7 +364,7 @@ std::vector<int> ToucanGraph::get_successors(int node) const {
 }
 
 bool ToucanGraph::has_node(int node) const {
-    return nodes.find(node) != nodes.end();
+    return nodes.contains(node);
 }
 
 bool ToucanGraph::has_edge(int from, int to) const {

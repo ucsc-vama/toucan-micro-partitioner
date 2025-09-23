@@ -31,7 +31,7 @@ void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroParti
         int part_id = pair.first;
         const auto& part = pair.second;
         for (int n : part->get_nodes()) {
-            assert(node_id_to_part_id.find(n) == node_id_to_part_id.end());
+            assert(!node_id_to_part_id.contains(n));
             node_id_to_part_id[n] = part_id;
         }
     }
@@ -40,7 +40,7 @@ void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroParti
         int part_id = pair.first;
         const auto& nodes = pair.second;
         for (int n : nodes) {
-            assert(node_id_to_part_id.find(n) == node_id_to_part_id.end());
+            assert(!node_id_to_part_id.contains(n));
             node_id_to_part_id[n] = part_id;
         }
     }
@@ -54,10 +54,10 @@ void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroParti
         std::unordered_set<int> part_output_edges;
         for (int n : part->get_nodes()) {
             for (int successor : G.get_successors(n)) {
-                if (part->get_nodes().find(successor) == part->get_nodes().end()) {
+                if (!part->get_nodes().contains(successor)) {
                     // Edge points outside current part
                     int dst_part_id = node_id_to_part_id[successor];
-                    if (part_output_edges.find(dst_part_id) == part_output_edges.end()) {
+                    if (!part_output_edges.contains(dst_part_id)) {
                         edges_to_add.emplace_back(part_id, dst_part_id);
                         part_output_edges.insert(dst_part_id);
                     }
@@ -73,10 +73,10 @@ void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroParti
         std::unordered_set<int> part_output_edges;
         for (int n : nodes) {
             for (int successor : G.get_successors(n)) {
-                if (nodes.find(successor) == nodes.end()) {
+                if (!nodes.contains(successor)) {
                     // Edge points outside current part
                     int dst_part_id = node_id_to_part_id[successor];
-                    if (part_output_edges.find(dst_part_id) == part_output_edges.end()) {
+                    if (!part_output_edges.contains(dst_part_id)) {
                         edges_to_add.emplace_back(part_id, dst_part_id);
                         part_output_edges.insert(dst_part_id);
                     }
@@ -104,7 +104,7 @@ void PartitionMerger::print_part_stat() const {
     for (const auto& pair : node_id_to_part) {
         int pid = pair.first;
         const auto& part = pair.second;
-        if (exclude_part_ids.find(pid) == exclude_part_ids.end()) {
+        if (!exclude_part_ids.contains(pid)) {
             norm_part_size.push_back(part->get_nodes().size());
             norm_part_depth.push_back(part->get_levels().size());
             norm_part_inputs.push_back(part->get_num_input_vars());
@@ -116,7 +116,7 @@ void PartitionMerger::print_part_stat() const {
     for (const auto& pair : exclude_id_to_nodes) {
         int pid = pair.first;
         const auto& nodes = pair.second;
-        if (exclude_part_ids.find(pid) != exclude_part_ids.end()) {
+        if (exclude_nodes.contains(pid)) {
             special_part_size.push_back(nodes.size());
             special_part_depth.push_back(1);
         }
@@ -163,7 +163,7 @@ void PartitionMerger::save(const std::string& filename) const {
         std::vector<int> current_level_exclude_nodes;
 
         for (int pid : level_nodes) {
-            if (exclude_part_ids.find(pid) != exclude_part_ids.end()) {
+            if (exclude_part_ids.contains(pid)) {
                 // Exclude part
                 const auto& nodes = exclude_id_to_nodes.at(pid);
                 assert(nodes.size() == 1);
@@ -208,7 +208,7 @@ int PartitionMerger::merge_direct_child() {
 
     for (const auto& pair : node_id_to_part) {
         int merge_to = pair.first;
-        if (exclude_part_ids.find(merge_to) != exclude_part_ids.end()) {
+        if (exclude_part_ids.contains(merge_to)) {
             continue;
         }
 
@@ -218,7 +218,7 @@ int PartitionMerger::merge_direct_child() {
         }
 
         int merge_from = merge_froms[0];
-        if (exclude_part_ids.find(merge_from) != exclude_part_ids.end()) {
+        if (exclude_part_ids.contains(merge_from)) {
             continue;
         }
 
@@ -241,8 +241,8 @@ int PartitionMerger::merge_direct_child() {
     std::cout << " " << merge_queue.size() << " pending merges\n";
     for (const auto& pair : merge_queue) {
         int pa = pair.first, pb = pair.second;
-        if (node_id_to_part.find(pa) != node_id_to_part.end() && 
-            node_id_to_part.find(pb) != node_id_to_part.end()) {
+        if (node_id_to_part.contains(pa) &&
+            node_id_to_part.contains(pb)) {
             if (try_merge_upart_nodes(pa, {pb})) {
                 merge_cnt++;
             }
@@ -332,19 +332,19 @@ int PartitionMerger::merge_adjacent_group() {
             const auto& pbs = pair.second;
             
             // Check if all parts still exist
-            if (node_id_to_part.find(pa) == node_id_to_part.end()) continue;
+            if (!node_id_to_part.contains(pa)) continue;
             bool all_exist = true;
             for (int pb : pbs) {
-                if (node_id_to_part.find(pb) == node_id_to_part.end()) {
+                if (!node_id_to_part.contains(pb)) {
                     all_exist = false;
                     break;
                 }
             }
             if (!all_exist) continue;
-            
-            assert(exclude_part_ids.find(pa) == exclude_part_ids.end());
+
+            assert(!exclude_part_ids.contains(pa));
             for (int pb : pbs) {
-                assert(exclude_part_ids.find(pb) == exclude_part_ids.end());
+                assert(!exclude_part_ids.contains(pb));
             }
             
             std::vector<int> pbs_vec(pbs.begin(), pbs.end());
@@ -386,8 +386,8 @@ int PartitionMerger::merge_siblings() {
             std::vector<int> successors;
             const auto& node_to_level = mg->get_node_to_level();
             for (int succ : mg->get_node_successors(n)) {
-                if (exclude_part_ids.find(succ) == exclude_part_ids.end() && 
-                    node_to_level.at(succ) == current_level + 1 && node_id_to_part.find(succ) != node_id_to_part.end()) {
+                if ((!exclude_part_ids.contains(succ)) &&
+                    node_to_level.at(succ) == current_level + 1 && node_id_to_part.contains(succ)) {
                     successors.push_back(succ);
                 }
             }
@@ -468,8 +468,8 @@ int PartitionMerger::merge_same_level() {
         // Get valid nodes at current level (not excluded, with live vars < 32)
         std::vector<int> nodes_valid;
         for (int n : levels[current_level]) {
-            if (node_id_to_part.find(n) != node_id_to_part.end() && 
-                exclude_part_ids.find(n) == exclude_part_ids.end()) {
+            if (node_id_to_part.contains(n) && 
+                (!exclude_part_ids.contains(n))) {
                 nodes_valid.push_back(n);
             }
         }
@@ -530,8 +530,8 @@ bool PartitionMerger::try_merge_upart_nodes(int to, const std::vector<int>& from
     }
 
     for (int n : all_nodes) {
-        assert(node_id_to_part.find(n) != node_id_to_part.end());
-        assert(exclude_part_ids.find(n) == exclude_part_ids.end());
+        assert(node_id_to_part.contains(n));
+        assert(!exclude_part_ids.contains(n));
     }
 
     // Create new merged partition

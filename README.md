@@ -12,35 +12,6 @@ The Toucan Micro Partitioner is a graph partitioning tool that:
 - Applies various merging strategies to optimize partition quality
 - Outputs partitioned results to files
 
-## Architecture
-
-The C++ implementation consists of several key components:
-
-### Core Classes
-
-1. **ToucanGraph** (`include/ToucanGraph.h`, `src/ToucanGraph.cpp`)
-   - Represents the input graph with nodes and edges
-   - Handles graph loading, levelization, and manipulation
-   - Supports VecDecl expansion and ConstDecl removal
-
-2. **MicroPartition** (`include/MicroPartition.h`, `src/MicroPartition.cpp`)
-   - Represents a single partition with liveness analysis
-   - Enforces GPU warp size constraints
-   - Tracks variable lifetimes and memory usage
-
-3. **MergeGraph** (`include/MergeGraph.h`, `src/MergeGraph.cpp`)
-   - Manages the partition dependency graph
-   - Supports acyclicity checking for merges
-   - Handles partition graph operations
-
-4. **PartitionMerger** (`include/PartitionMerger.h`, `src/PartitionMerger.cpp`)
-   - Implements various merging strategies
-   - Optimizes partition quality through iterative merging
-   - Provides statistics and output generation
-
-5. **Utils** (`include/Utils.h`, `src/Utils.cpp`)
-   - Utility functions for file I/O and statistics
-   - String processing and data manipulation helpers
 
 ## Building
 
@@ -90,15 +61,6 @@ make
 ...
 ```
 
-## Performance Improvements
-
-The C++ implementation provides several performance benefits over the Python version:
-
-1. **Memory Efficiency**: Direct memory management and optimized data structures
-2. **CPU Performance**: Compiled code with aggressive optimizations (-O3, -march=native)
-3. **Cache Locality**: Better data layout for graph traversal operations
-4. **Reduced Overhead**: No Python interpreter overhead or GIL limitations
-
 ## Algorithm Overview
 
 The partitioning algorithm follows these main steps:
@@ -113,28 +75,9 @@ The partitioning algorithm follows these main steps:
    - Same-level merging
 5. **Output Generation**: Write final partitions to output files
 
-## Development Status
-
-- [x] Core data structures implemented
-- [x] Graph loading and manipulation
-- [x] Basic partition framework
-- [ ] Complete partitioning algorithm (partitioner2)
-- [ ] Full merging implementation
-- [ ] Comprehensive testing
-- [ ] Performance benchmarking
-
-## Future Work
-
-- Complete implementation of the partitioning algorithm
-- Add comprehensive unit tests
-- Performance benchmarking against Python version
-- Memory usage optimization
-- Parallel processing support
 
 ## Dependencies
 
-- C++17 compatible compiler
+- C++20 compatible compiler
 - CMake 3.16 or higher
 - Standard C++ library
-
-No external dependencies required - the implementation uses only standard library components for maximum portability.

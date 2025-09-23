@@ -42,15 +42,14 @@ std::vector<int> MergeGraph::get_node_predecessors(int node) const {
 }
 
 int MergeGraph::get_node_in_degree(int node) const {
-    auto it = reverse_adjacency_list.find(node);
-    if (it != reverse_adjacency_list.end()) {
-        return it->second.size();
+    if (reverse_adjacency_list.contains(node)) {
+        return reverse_adjacency_list.at(node).size();
     }
     return 0;
 }
 
 bool MergeGraph::has_node(int node) const {
-    return adjacency_list.find(node) != adjacency_list.end();
+    return adjacency_list.contains(node);
 }
 
 int MergeGraph::max_node() const {
@@ -106,21 +105,23 @@ bool MergeGraph::merge_is_acyclic(const std::unordered_set<int>& nodes_to_merge)
         while (!queue.empty()) {
             int current = queue.front();
             queue.pop();
-            
-            for (int successor : get_node_successors(current)) {
-                if (visited.count(successor)) continue;
-                
-                // Check if this successor is in nodes_to_merge but at a different level
-                if (nodes_to_merge.count(successor)) {
-                    int succ_level = node_to_level[successor];
-                    if (succ_level != source_level) {
-                        // Found external path between merge nodes at different levels
-                        return false;
+
+            if (adjacency_list.contains(current)) {
+                for (auto &successor: adjacency_list[current]) {
+                    if (visited.count(successor)) continue;
+
+                    // Check if this successor is in nodes_to_merge but at a different level
+                    if (nodes_to_merge.count(successor)) {
+                        int succ_level = node_to_level[successor];
+                        if (succ_level != source_level) {
+                            // Found external path between merge nodes at different levels
+                            return false;
+                        }
+                    } else {
+                        // Continue BFS through external nodes
+                        visited.insert(successor);
+                        queue.push(successor);
                     }
-                } else {
-                    // Continue BFS through external nodes
-                    visited.insert(successor);
-                    queue.push(successor);
                 }
             }
         }
@@ -218,16 +219,9 @@ void MergeGraph::levelize() {
             queue.push(v);
         }
     }
-    // for (const auto& pair : in_degree) {
-    //     if (pair.second == 0) {
-    //         queue.push(pair.first);
-    //     }
-    // }
-    // int cnt = 0;
+
     int current_level = 0;
     while (!queue.empty()) {
-        // std::cerr << cnt << ". \n";
-        // cnt++;
         int level_size = queue.size();
         std::vector<int> current_level_nodes;
         
@@ -239,10 +233,13 @@ void MergeGraph::levelize() {
             node_to_level[node] = current_level;
             
             // Reduce in-degree of successors
-            for (int successor : get_node_successors(node)) {
-                in_degree[successor]--;
-                if (in_degree[successor] == 0) {
-                    queue.push(successor);
+            if (adjacency_list.contains(node)) {
+                for (auto &successor: adjacency_list[node]) {
+                    in_degree[successor]--;
+                    assert(in_degree[successor] >= 0);
+                    if (in_degree[successor] == 0) {
+                        queue.push(successor);
+                    }
                 }
             }
         }
