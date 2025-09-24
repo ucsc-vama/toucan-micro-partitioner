@@ -5,6 +5,7 @@
 #include <iostream>
 #include <string>
 #include <chrono>
+#include <cassert>
 
 struct Args {
     std::string graph;
@@ -81,6 +82,8 @@ int main(int argc, char* argv[]) {
         merger.build_part_mg(parts);
         merger.print_part_stat();
 
+        int nodes_in_all_mparts = merger.get_mp_vtx_cnt();
+
         int merge_cnt = 0;
 
         // Multiple merge phases
@@ -138,6 +141,8 @@ int main(int argc, char* argv[]) {
             if (merge_cnt == 0) break;
         }
         merger.print_part_stat();
+
+        assert(nodes_in_all_mparts == merger.get_mp_vtx_cnt() && "Some nodes are missing during merge!");
         
         std::cout << "> Done\n";
         merger.save(args.output);
