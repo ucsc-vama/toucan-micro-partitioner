@@ -345,6 +345,7 @@ void ToucanGraph::save_vector_def_info(const std::string& filename) const {
         }
         out << "\n";
     }
+    out.close();
 }
 
 std::vector<int> ToucanGraph::get_predecessors(int node) const {

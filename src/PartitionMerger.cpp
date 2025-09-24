@@ -86,6 +86,9 @@ void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroParti
     }
 
     mg->add_edges(edges_to_add);
+
+    // Note: should not have parallel edge. though using std::unordered_set may be a good option, do manual hack for memory usage.
+    mg->edge_dedup();
 }
 
 void PartitionMerger::print_part_stat() const {
@@ -147,6 +150,60 @@ void PartitionMerger::print_part_stat() const {
     std::cout << "\n";
 }
 
+int PartitionMerger::get_mp_vtx_cnt() {
+    const auto& levels = mg->get_levels();
+    std::unordered_set<int> allMPVtxes;
+
+    for (size_t level_id = 0; level_id < levels.size(); ++level_id) {
+
+        for (int pid : levels[level_id]) {
+            if (exclude_part_ids.contains(pid)) {
+            } else {
+                // Normal part
+                const auto& part = node_id_to_part.at(pid);
+
+                for (const auto& eachLevel : part->get_levels()) {
+                    for (const auto &n: eachLevel) {
+                        assert(!allMPVtxes.contains(n));
+                        allMPVtxes.insert(n);
+                    }
+                }
+            }
+        }
+    }
+
+    return allMPVtxes.size();
+}
+
+void PartitionMerger::print_mp_vtx_cnt() {
+    const auto& levels = mg->get_levels();
+    std::unordered_set<int> allMPVtxes, allExcludeVtxes;
+
+    for (size_t level_id = 0; level_id < levels.size(); ++level_id) {
+
+        for (int pid : levels[level_id]) {
+            if (exclude_part_ids.contains(pid)) {
+                // Exclude part
+                const auto& nodes = exclude_id_to_nodes.at(pid);
+                assert(nodes.size() == 1);
+                allExcludeVtxes.insert(*nodes.begin());
+            } else {
+                // Normal part
+                const auto& part = node_id_to_part.at(pid);
+
+                for (const auto& eachLevel : part->get_levels()) {
+                    for (const auto &n: eachLevel) {
+                        assert(!allMPVtxes.contains(n));
+                        allMPVtxes.insert(n);
+                    }
+                }
+            }
+        }
+    }
+
+    std::cerr << " >>>>>>>---> Has " << allMPVtxes.size() << " MP vtxes, " << allExcludeVtxes.size() << " exclude vtxes\n";
+}
+
 void PartitionMerger::save(const std::string& filename) const {
     mg->levelize();
     
@@ -198,6 +255,7 @@ void PartitionMerger::save(const std::string& filename) const {
             out << "\n";
         }
     }
+    out.close();
 }
 
 int PartitionMerger::merge_direct_child() {
@@ -383,14 +441,16 @@ int PartitionMerger::merge_siblings() {
             }
             
             // Get successors at next level that are not excluded
+            std::unordered_set<int> unique_successors;
             std::vector<int> successors;
             const auto& node_to_level = mg->get_node_to_level();
             for (int succ : mg->get_node_successors(n)) {
                 if ((!exclude_part_ids.contains(succ)) &&
                     node_to_level.at(succ) == current_level + 1 && node_id_to_part.contains(succ)) {
-                    successors.push_back(succ);
+                    unique_successors.insert(succ);
                 }
             }
+            successors.assign(unique_successors.begin(), unique_successors.end());
 
             // Sort by live vars (smallest first)
             std::sort(successors.begin(), successors.end(), [&](int a, int b) {
@@ -522,6 +582,7 @@ void PartitionMerger::check_mg() const {
 bool PartitionMerger::try_merge_upart_nodes(int to, const std::vector<int>& from_nodes, bool check_acyclic) {
     std::unordered_set<int> all_nodes = {to};
     all_nodes.insert(from_nodes.begin(), from_nodes.end());
+    assert(all_nodes.size() == (from_nodes.size() + 1));
 
     if (check_acyclic) {
         if (!mg->merge_is_acyclic(all_nodes)) {

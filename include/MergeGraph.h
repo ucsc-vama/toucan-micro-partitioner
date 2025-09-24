@@ -26,6 +26,7 @@ public:
     bool merge_is_acyclic(const std::unordered_set<int>& nodes_to_merge);
     void merge_nodes(int to, const std::vector<int>& from_list);
     void graph_gc();
+    void edge_dedup();
     void check_graph() const;
     void levelize();
 

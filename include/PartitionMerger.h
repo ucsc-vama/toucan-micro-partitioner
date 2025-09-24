@@ -28,6 +28,10 @@ public:
     // Utility
     void check_mg() const;
 
+    int get_mp_vtx_cnt();
+
+    void print_mp_vtx_cnt();
+
 private:
     std::unique_ptr<MergeGraph> mg;
     const ToucanGraph& G;

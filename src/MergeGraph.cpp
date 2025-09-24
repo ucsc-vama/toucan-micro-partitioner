@@ -188,6 +188,32 @@ void MergeGraph::graph_gc() {
     nodes_to_remove.clear();
 }
 
+void MergeGraph::edge_dedup() {
+    // Remove parallel edges by converting vectors to sets and back
+    for (auto& pair : adjacency_list) {
+        auto& successors = pair.second;
+        if (successors.size() > 1) {
+            // Convert to set to remove duplicates, then back to vector
+            std::unordered_set<int> unique_successors(successors.begin(), successors.end());
+            successors.assign(unique_successors.begin(), unique_successors.end());
+            // Sort for consistent ordering
+            std::sort(successors.begin(), successors.end());
+        }
+    }
+
+    // Do the same for reverse adjacency list
+    for (auto& pair : reverse_adjacency_list) {
+        auto& predecessors = pair.second;
+        if (predecessors.size() > 1) {
+            // Convert to set to remove duplicates, then back to vector
+            std::unordered_set<int> unique_predecessors(predecessors.begin(), predecessors.end());
+            predecessors.assign(unique_predecessors.begin(), unique_predecessors.end());
+            // Sort for consistent ordering
+            std::sort(predecessors.begin(), predecessors.end());
+        }
+    }
+}
+
 void MergeGraph::check_graph() const {
     if (!is_acyclic()) {
         throw std::runtime_error("Graph contains cycles");
@@ -207,7 +233,7 @@ void MergeGraph::levelize() {
     // in_degree.reserve(adjacency_list.size());
     for (const auto& pair : adjacency_list) {
         int node = pair.first;
-        assert(node < in_degree.size());
+        assert(static_cast<size_t>(node) < in_degree.size());
         in_degree[node] = get_node_in_degree(node);
     }
     
