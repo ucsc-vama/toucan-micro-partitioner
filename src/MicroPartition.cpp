@@ -1,4 +1,6 @@
 #include "MicroPartition.h"
+#include <climits>
+#include <cstdint>
 #include <iostream>
 #include <algorithm>
 #include <queue>
@@ -116,16 +118,17 @@ void MicroPartition::collect_variable_liveness() {
         }
         
         if (life_start != life_end) {
-            assert(var_life_cycle.find(node) == var_life_cycle.end());
+            assert(!var_life_cycle.contains(node));
             var_life_cycle[node] = {life_start, life_end};
         } else {
             // Sink node - should not happen in normal cases
             assert(false);
         }
     }
-    
+
     // Handle external inputs
-    int vecArith_cnt = 0;
+    // Since in micro partitioner, we cannot distinguish different VecArith result segments, just treat each reference as unique for safety.
+    int nextUnusedVarId = INT_MAX;
     for (int node : nodes) {
         for (int pred : G->get_predecessors(node)) {
             const auto& pred_attrs = G->get_nodes().at(pred);
@@ -133,10 +136,13 @@ void MicroPartition::collect_variable_liveness() {
             int var_id = pred;
             if (is_merge_result_node_tag(pred_attrs.tag)) {
                 // Special handling for VecArith
-                var_id = pred + 1000000 + vecArith_cnt; // Simple way to make unique
-                vecArith_cnt++;
+                // Don't care exact id, just make it unique
+                var_id = nextUnusedVarId;
+                nextUnusedVarId--;
+                assert(nextUnusedVarId > 0);
+                assert(!var_life_cycle.contains(var_id));
+                assert(!nodes.contains(var_id) && "If this hit, there may be too many nodes");
             }
-            
             if (nodes.count(pred)) {
                 assert(var_life_cycle.count(var_id));
             } else {

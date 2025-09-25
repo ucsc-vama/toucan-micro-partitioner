@@ -349,17 +349,15 @@ void ToucanGraph::save_vector_def_info(const std::string& filename) const {
 }
 
 std::vector<int> ToucanGraph::get_predecessors(int node) const {
-    auto it = reverse_adjacency_list.find(node);
-    if (it != reverse_adjacency_list.end()) {
-        return it->second;
+    if (reverse_adjacency_list.contains(node)) {
+        return reverse_adjacency_list.at(node);
     }
     return {};
 }
 
 std::vector<int> ToucanGraph::get_successors(int node) const {
-    auto it = adjacency_list.find(node);
-    if (it != adjacency_list.end()) {
-        return it->second;
+    if (adjacency_list.contains(node)) {
+        return adjacency_list.at(node);
     }
     return {};
 }
