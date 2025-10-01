@@ -4,6 +4,8 @@
 #include <cassert>
 #include <iostream>
 #include <stdexcept>
+#include <functional>
+#include <cstddef>
 
 MergeGraph::MergeGraph() : next_id(0) {}
 
