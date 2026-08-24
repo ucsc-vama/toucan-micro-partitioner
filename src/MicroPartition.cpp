@@ -32,7 +32,7 @@ MicroPartition& MicroPartition::operator=(const MicroPartition& other) {
 }
 
 void MicroPartition::calculate_node_level() {
-    for (int node : nodes) {
+    for ([[maybe_unused]] int node : nodes) {
         // assert(excluded_nodes.find(node) == excluded_nodes.end());
         assert(G->has_node(node));
     }
@@ -211,7 +211,7 @@ bool MicroPartition::check_liveness_constraint() {
     
     // Handle final variables
     if (level_var_deactive.count(PART_MAX_LEVEL)) {
-        for (int var : level_var_deactive[PART_MAX_LEVEL]) {
+        for ([[maybe_unused]] int var : level_var_deactive[PART_MAX_LEVEL]) {
             assert(current_live_vars.count(var));
         }
         assert(current_live_vars.size() == level_var_deactive[PART_MAX_LEVEL].size());
@@ -360,7 +360,7 @@ std::vector<std::unique_ptr<MicroPartition>> partitioner2(
         
         // Create new partition starting with seed
         auto part = std::make_unique<MicroPartition>(&G);
-        bool success = part->try_add_nodes({seed});
+        [[maybe_unused]] bool success = part->try_add_nodes({seed});
         assert(success);
         
         // Get seed's level for MFFC traversal using O(1) lookup

@@ -311,7 +311,7 @@ void ToucanGraph::expand_VecDecl(const std::unordered_map<int, std::vector<int>>
         num_new_nodes += new_node_list.size();
 
         // Verify in-degree
-        for (int new_node : new_node_list) {
+        for ([[maybe_unused]] int new_node : new_node_list) {
             assert(get_in_degree(new_node) == 1);
         }
     }

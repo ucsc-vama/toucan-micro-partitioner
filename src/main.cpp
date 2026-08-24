@@ -82,7 +82,7 @@ int main(int argc, char* argv[]) {
         merger.build_part_mg(parts);
         merger.print_part_stat();
 
-        int nodes_in_all_mparts = merger.get_mp_vtx_cnt();
+        [[maybe_unused]] int nodes_in_all_mparts = merger.get_mp_vtx_cnt();
 
         int merge_cnt = 0;
 

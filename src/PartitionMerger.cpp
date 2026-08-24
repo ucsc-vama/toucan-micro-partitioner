@@ -401,7 +401,7 @@ int PartitionMerger::merge_adjacent_group() {
             if (!all_exist) continue;
 
             assert(!exclude_part_ids.contains(pa));
-            for (int pb : pbs) {
+            for ([[maybe_unused]] int pb : pbs) {
                 assert(!exclude_part_ids.contains(pb));
             }
             
@@ -573,7 +573,7 @@ int PartitionMerger::merge_same_level() {
 }
 
 void PartitionMerger::check_mg() const {
-    for (const auto& pair : node_id_to_part) {
+    for ([[maybe_unused]] const auto& pair : node_id_to_part) {
         assert(pair.second->get_max_live_vars() != -1);
     }
     mg->check_graph();
@@ -590,7 +590,7 @@ bool PartitionMerger::try_merge_upart_nodes(int to, const std::vector<int>& from
         }
     }
 
-    for (int n : all_nodes) {
+    for ([[maybe_unused]] int n : all_nodes) {
         assert(node_id_to_part.contains(n));
         assert(!exclude_part_ids.contains(n));
     }
