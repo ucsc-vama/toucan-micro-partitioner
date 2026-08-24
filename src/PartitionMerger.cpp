@@ -1,16 +1,16 @@
 #include "PartitionMerger.h"
 #include "Utils.h"
-#include <iostream>
 #include <algorithm>
-#include <fstream>
 #include <cassert>
+#include <fstream>
+#include <iostream>
 
-PartitionMerger::PartitionMerger(const ToucanGraph& G, const std::unordered_set<int>& exclude_nodes)
+PartitionMerger::PartitionMerger(const ToucanGraph &G, const std::unordered_set<int> &exclude_nodes)
     : G(G), exclude_nodes(exclude_nodes) {
     mg = std::make_unique<MergeGraph>();
 }
 
-void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroPartition>>& parts) {
+void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroPartition>> &parts) {
     // Add nodes for all parts
     for (size_t i = 0; i < parts.size(); ++i) {
         int part_id = mg->add_node();
@@ -27,18 +27,18 @@ void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroParti
 
     // Map from node_id to part_id
     std::unordered_map<int, int> node_id_to_part_id;
-    for (const auto& pair : node_id_to_part) {
+    for (const auto &pair : node_id_to_part) {
         int part_id = pair.first;
-        const auto& part = pair.second;
+        const auto &part = pair.second;
         for (int n : part->get_nodes()) {
             assert(!node_id_to_part_id.contains(n));
             node_id_to_part_id[n] = part_id;
         }
     }
 
-    for (const auto& pair : exclude_id_to_nodes) {
+    for (const auto &pair : exclude_id_to_nodes) {
         int part_id = pair.first;
-        const auto& nodes = pair.second;
+        const auto &nodes = pair.second;
         for (int n : nodes) {
             assert(!node_id_to_part_id.contains(n));
             node_id_to_part_id[n] = part_id;
@@ -47,10 +47,10 @@ void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroParti
 
     // Build edges
     std::vector<std::pair<int, int>> edges_to_add;
-    for (const auto& pair : node_id_to_part) {
+    for (const auto &pair : node_id_to_part) {
         int part_id = pair.first;
-        const auto& part = pair.second;
-        
+        const auto &part = pair.second;
+
         std::unordered_set<int> part_output_edges;
         for (int n : part->get_nodes()) {
             for (int successor : G.get_successors(n)) {
@@ -66,10 +66,10 @@ void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroParti
         }
     }
 
-    for (const auto& pair : exclude_id_to_nodes) {
+    for (const auto &pair : exclude_id_to_nodes) {
         int part_id = pair.first;
-        const auto& nodes = pair.second;
-        
+        const auto &nodes = pair.second;
+
         std::unordered_set<int> part_output_edges;
         for (int n : nodes) {
             for (int successor : G.get_successors(n)) {
@@ -87,15 +87,16 @@ void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroParti
 
     mg->add_edges(edges_to_add);
 
-    // Note: should not have parallel edge. though using std::unordered_set may be a good option, do manual hack for memory usage.
+    // Note: should not have parallel edge. though using std::unordered_set may be a good option, do
+    // manual hack for memory usage.
     mg->edge_dedup();
 }
 
 void PartitionMerger::print_part_stat() const {
     mg->levelize();
-    
+
     int max_levels = mg->get_levels().size();
-    
+
     std::vector<int> norm_part_size;
     std::vector<int> norm_part_depth;
     std::vector<int> norm_part_inputs;
@@ -104,9 +105,9 @@ void PartitionMerger::print_part_stat() const {
     std::vector<int> special_part_size;
     std::vector<int> special_part_depth;
 
-    for (const auto& pair : node_id_to_part) {
+    for (const auto &pair : node_id_to_part) {
         int pid = pair.first;
-        const auto& part = pair.second;
+        const auto &part = pair.second;
         if (!exclude_part_ids.contains(pid)) {
             norm_part_size.push_back(part->get_nodes().size());
             norm_part_depth.push_back(part->get_levels().size());
@@ -116,9 +117,9 @@ void PartitionMerger::print_part_stat() const {
         }
     }
 
-    for (const auto& pair : exclude_id_to_nodes) {
+    for (const auto &pair : exclude_id_to_nodes) {
         int pid = pair.first;
-        const auto& nodes = pair.second;
+        const auto &nodes = pair.second;
         if (exclude_nodes.contains(pid)) {
             special_part_size.push_back(nodes.size());
             special_part_depth.push_back(1);
@@ -128,30 +129,44 @@ void PartitionMerger::print_part_stat() const {
     std::cout << "Part graph has " << max_levels << " levels\n";
     std::cout << "Has " << norm_part_size.size() << " normal parts:\n";
     if (!norm_part_size.empty()) {
-        std::cout << "size: mean " << Utils::mean(norm_part_size) << ", min " << Utils::min_value(norm_part_size) 
-                  << ", max " << Utils::max_value(norm_part_size) << ", median " << Utils::median(norm_part_size) << "\n";
-        std::cout << "depth: mean " << Utils::mean(norm_part_depth) << ", min " << Utils::min_value(norm_part_depth) 
-                  << ", max " << Utils::max_value(norm_part_depth) << ", median " << Utils::median(norm_part_depth) << "\n";
-        std::cout << "input vars: mean " << Utils::mean(norm_part_inputs) << ", min " << Utils::min_value(norm_part_inputs) 
-                  << ", max " << Utils::max_value(norm_part_inputs) << ", median " << Utils::median(norm_part_inputs) << "\n";
-        std::cout << "output vars: mean " << Utils::mean(norm_part_outputs) << ", min " << Utils::min_value(norm_part_outputs) 
-                  << ", max " << Utils::max_value(norm_part_outputs) << ", median " << Utils::median(norm_part_outputs) << "\n";
-        std::cout << "max live vars: mean " << Utils::mean(norm_part_active_vars) << ", min " << Utils::min_value(norm_part_active_vars) 
-                  << ", max " << Utils::max_value(norm_part_active_vars) << ", median " << Utils::median(norm_part_active_vars) << "\n";
+        std::cout << "size: mean " << Utils::mean(norm_part_size) << ", min "
+                  << Utils::min_value(norm_part_size) << ", max "
+                  << Utils::max_value(norm_part_size) << ", median "
+                  << Utils::median(norm_part_size) << "\n";
+        std::cout << "depth: mean " << Utils::mean(norm_part_depth) << ", min "
+                  << Utils::min_value(norm_part_depth) << ", max "
+                  << Utils::max_value(norm_part_depth) << ", median "
+                  << Utils::median(norm_part_depth) << "\n";
+        std::cout << "input vars: mean " << Utils::mean(norm_part_inputs) << ", min "
+                  << Utils::min_value(norm_part_inputs) << ", max "
+                  << Utils::max_value(norm_part_inputs) << ", median "
+                  << Utils::median(norm_part_inputs) << "\n";
+        std::cout << "output vars: mean " << Utils::mean(norm_part_outputs) << ", min "
+                  << Utils::min_value(norm_part_outputs) << ", max "
+                  << Utils::max_value(norm_part_outputs) << ", median "
+                  << Utils::median(norm_part_outputs) << "\n";
+        std::cout << "max live vars: mean " << Utils::mean(norm_part_active_vars) << ", min "
+                  << Utils::min_value(norm_part_active_vars) << ", max "
+                  << Utils::max_value(norm_part_active_vars) << ", median "
+                  << Utils::median(norm_part_active_vars) << "\n";
     }
 
     std::cout << "Has " << special_part_size.size() << " special (vector) parts";
     if (!special_part_size.empty()) {
-        std::cout << ", size: mean " << Utils::mean(special_part_size) << ", min " << Utils::min_value(special_part_size) 
-                  << ", max " << Utils::max_value(special_part_size) << ", median " << Utils::median(special_part_size)
-                  << ", depth: mean " << Utils::mean(special_part_depth) << ", min " << Utils::min_value(special_part_depth) 
-                  << ", max " << Utils::max_value(special_part_depth) << ", median " << Utils::median(special_part_depth);
+        std::cout << ", size: mean " << Utils::mean(special_part_size) << ", min "
+                  << Utils::min_value(special_part_size) << ", max "
+                  << Utils::max_value(special_part_size) << ", median "
+                  << Utils::median(special_part_size) << ", depth: mean "
+                  << Utils::mean(special_part_depth) << ", min "
+                  << Utils::min_value(special_part_depth) << ", max "
+                  << Utils::max_value(special_part_depth) << ", median "
+                  << Utils::median(special_part_depth);
     }
     std::cout << "\n";
 }
 
 int PartitionMerger::get_mp_vtx_cnt() {
-    const auto& levels = mg->get_levels();
+    const auto &levels = mg->get_levels();
     std::unordered_set<int> allMPVtxes;
 
     for (size_t level_id = 0; level_id < levels.size(); ++level_id) {
@@ -160,10 +175,10 @@ int PartitionMerger::get_mp_vtx_cnt() {
             if (exclude_part_ids.contains(pid)) {
             } else {
                 // Normal part
-                const auto& part = node_id_to_part.at(pid);
+                const auto &part = node_id_to_part.at(pid);
 
-                for (const auto& eachLevel : part->get_levels()) {
-                    for (const auto &n: eachLevel) {
+                for (const auto &eachLevel : part->get_levels()) {
+                    for (const auto &n : eachLevel) {
                         assert(!allMPVtxes.contains(n));
                         allMPVtxes.insert(n);
                     }
@@ -176,7 +191,7 @@ int PartitionMerger::get_mp_vtx_cnt() {
 }
 
 void PartitionMerger::print_mp_vtx_cnt() {
-    const auto& levels = mg->get_levels();
+    const auto &levels = mg->get_levels();
     std::unordered_set<int> allMPVtxes, allExcludeVtxes;
 
     for (size_t level_id = 0; level_id < levels.size(); ++level_id) {
@@ -184,15 +199,15 @@ void PartitionMerger::print_mp_vtx_cnt() {
         for (int pid : levels[level_id]) {
             if (exclude_part_ids.contains(pid)) {
                 // Exclude part
-                const auto& nodes = exclude_id_to_nodes.at(pid);
+                const auto &nodes = exclude_id_to_nodes.at(pid);
                 assert(nodes.size() == 1);
                 allExcludeVtxes.insert(*nodes.begin());
             } else {
                 // Normal part
-                const auto& part = node_id_to_part.at(pid);
+                const auto &part = node_id_to_part.at(pid);
 
-                for (const auto& eachLevel : part->get_levels()) {
-                    for (const auto &n: eachLevel) {
+                for (const auto &eachLevel : part->get_levels()) {
+                    for (const auto &n : eachLevel) {
                         assert(!allMPVtxes.contains(n));
                         allMPVtxes.insert(n);
                     }
@@ -201,20 +216,21 @@ void PartitionMerger::print_mp_vtx_cnt() {
         }
     }
 
-    std::cerr << " >>>>>>>---> Has " << allMPVtxes.size() << " MP vtxes, " << allExcludeVtxes.size() << " exclude vtxes\n";
+    std::cerr << " >>>>>>>---> Has " << allMPVtxes.size() << " MP vtxes, " << allExcludeVtxes.size()
+              << " exclude vtxes\n";
 }
 
-void PartitionMerger::save(const std::string& filename) const {
+void PartitionMerger::save(const std::string &filename) const {
     mg->levelize();
-    
+
     std::ofstream out(filename);
     if (!out.is_open()) {
         throw std::runtime_error("Cannot open file for writing: " + filename);
     }
 
-    const auto& levels = mg->get_levels();
+    const auto &levels = mg->get_levels();
     for (size_t level_id = 0; level_id < levels.size(); ++level_id) {
-        const auto& level_nodes = levels[level_id];
+        const auto &level_nodes = levels[level_id];
         out << "L " << level_id << "\n";
 
         std::vector<int> current_level_exclude_nodes;
@@ -222,17 +238,17 @@ void PartitionMerger::save(const std::string& filename) const {
         for (int pid : level_nodes) {
             if (exclude_part_ids.contains(pid)) {
                 // Exclude part
-                const auto& nodes = exclude_id_to_nodes.at(pid);
+                const auto &nodes = exclude_id_to_nodes.at(pid);
                 assert(nodes.size() == 1);
                 current_level_exclude_nodes.push_back(*nodes.begin());
             } else {
                 // Normal part
-                const auto& part = node_id_to_part.at(pid);
+                const auto &part = node_id_to_part.at(pid);
                 assert(!part->get_nodes().empty());
                 assert(!part->get_levels().empty());
-                
+
                 out << "n";
-                for (const auto& eachLevel : part->get_levels()) {
+                for (const auto &eachLevel : part->get_levels()) {
                     assert(!eachLevel.empty());
                     out << " l";
                     std::vector<int> sorted_level(eachLevel.begin(), eachLevel.end());
@@ -260,11 +276,11 @@ void PartitionMerger::save(const std::string& filename) const {
 
 int PartitionMerger::merge_direct_child() {
     check_mg();
-    
+
     int merge_cnt = 0;
     std::vector<std::pair<int, int>> merge_queue;
 
-    for (const auto& pair : node_id_to_part) {
+    for (const auto &pair : node_id_to_part) {
         int merge_to = pair.first;
         if (exclude_part_ids.contains(merge_to)) {
             continue;
@@ -280,7 +296,7 @@ int PartitionMerger::merge_direct_child() {
             continue;
         }
 
-        const auto& node_to_level = mg->get_node_to_level();
+        const auto &node_to_level = mg->get_node_to_level();
         int merge_to_level = node_to_level.at(merge_to);
         int merge_from_level = node_to_level.at(merge_from);
 
@@ -292,15 +308,16 @@ int PartitionMerger::merge_direct_child() {
     }
 
     // Sort merge queue
-    std::sort(merge_queue.begin(), merge_queue.end(), [&](const std::pair<int, int>& a, const std::pair<int, int>& b) {
-        return node_id_to_part.at(a.second)->get_nodes().size() < node_id_to_part.at(b.second)->get_nodes().size();
-    });
+    std::sort(merge_queue.begin(), merge_queue.end(),
+              [&](const std::pair<int, int> &a, const std::pair<int, int> &b) {
+                  return node_id_to_part.at(a.second)->get_nodes().size() <
+                         node_id_to_part.at(b.second)->get_nodes().size();
+              });
 
     std::cout << " " << merge_queue.size() << " pending merges\n";
-    for (const auto& pair : merge_queue) {
+    for (const auto &pair : merge_queue) {
         int pa = pair.first, pb = pair.second;
-        if (node_id_to_part.contains(pa) &&
-            node_id_to_part.contains(pb)) {
+        if (node_id_to_part.contains(pa) && node_id_to_part.contains(pb)) {
             if (try_merge_upart_nodes(pa, {pb})) {
                 merge_cnt++;
             }
@@ -316,61 +333,62 @@ int PartitionMerger::merge_direct_child() {
 
 int PartitionMerger::merge_adjacent_group() {
     check_mg();
-    
+
     int total_merge_cnt = 0;
     int iter_start_level = 0;
-    
+
     while (static_cast<size_t>(iter_start_level + 1) < mg->get_levels().size()) {
         int merge_cnt = 0;
-        
-        const auto& levels = mg->get_levels();
-        const auto& level_nodes = levels[iter_start_level];
-        
+
+        const auto &levels = mg->get_levels();
+        const auto &level_nodes = levels[iter_start_level];
+
         std::unordered_set<int> nodes_visited;
         std::vector<std::pair<int, std::unordered_set<int>>> merge_queue;
-        
+
         for (int each_node : level_nodes) {
             if (nodes_visited.count(each_node) || exclude_part_ids.count(each_node)) {
                 continue;
             }
-            
+
             auto childs = mg->get_node_successors(each_node);
             std::unordered_set<int> childs_next_level;
-            
-            const auto& node_to_level = mg->get_node_to_level();
+
+            const auto &node_to_level = mg->get_node_to_level();
             for (int child : childs) {
                 if (node_to_level.at(child) == iter_start_level + 1) {
                     childs_next_level.insert(child);
                 }
             }
-            
+
             if (childs_next_level.empty()) {
                 continue;
             }
-            
+
             // Find all predecessors of children at this level
             std::unordered_set<int> child_all_predecessors;
             for (int c : childs_next_level) {
                 auto preds = mg->get_node_predecessors(c);
                 child_all_predecessors.insert(preds.begin(), preds.end());
             }
-            
+
             std::unordered_set<int> child_all_predecessors_this_level;
             for (int pred : child_all_predecessors) {
                 if (node_to_level.at(pred) == iter_start_level) {
                     child_all_predecessors_this_level.insert(pred);
                 }
             }
-            
+
             assert(!child_all_predecessors_this_level.empty());
             assert(child_all_predecessors_this_level.count(each_node));
-            
+
             // Nodes to merge
             std::unordered_set<int> new_part_vtxes;
             new_part_vtxes.insert(childs_next_level.begin(), childs_next_level.end());
-            new_part_vtxes.insert(child_all_predecessors_this_level.begin(), child_all_predecessors_this_level.end());
+            new_part_vtxes.insert(child_all_predecessors_this_level.begin(),
+                                  child_all_predecessors_this_level.end());
             nodes_visited.insert(new_part_vtxes.begin(), new_part_vtxes.end());
-            
+
             // Skip if contains exclude parts
             bool has_exclude = false;
             for (int vtx : new_part_vtxes) {
@@ -379,18 +397,20 @@ int PartitionMerger::merge_adjacent_group() {
                     break;
                 }
             }
-            if (has_exclude) continue;
-            
+            if (has_exclude)
+                continue;
+
             new_part_vtxes.erase(each_node);
             merge_queue.emplace_back(each_node, new_part_vtxes);
         }
-        
-        for (const auto& pair : merge_queue) {
+
+        for (const auto &pair : merge_queue) {
             int pa = pair.first;
-            const auto& pbs = pair.second;
-            
+            const auto &pbs = pair.second;
+
             // Check if all parts still exist
-            if (!node_id_to_part.contains(pa)) continue;
+            if (!node_id_to_part.contains(pa))
+                continue;
             bool all_exist = true;
             for (int pb : pbs) {
                 if (!node_id_to_part.contains(pb)) {
@@ -398,52 +418,53 @@ int PartitionMerger::merge_adjacent_group() {
                     break;
                 }
             }
-            if (!all_exist) continue;
+            if (!all_exist)
+                continue;
 
             assert(!exclude_part_ids.contains(pa));
             for ([[maybe_unused]] int pb : pbs) {
                 assert(!exclude_part_ids.contains(pb));
             }
-            
+
             std::vector<int> pbs_vec(pbs.begin(), pbs.end());
             if (try_merge_upart_nodes(pa, pbs_vec, false)) {
                 merge_cnt++;
             }
         }
-        
+
         mg->graph_gc();
         mg->levelize();
-        
+
         if (merge_cnt == 0) {
             iter_start_level++;
         } else {
             total_merge_cnt += merge_cnt;
         }
     }
-    
+
     return total_merge_cnt;
 }
 
 int PartitionMerger::merge_siblings() {
     check_mg();
-    
+
     int total_merge_cnt = 0;
     int current_level = 0;
     std::unordered_set<int> nodes_no_feasible_merge;
-    
+
     while (static_cast<size_t>(current_level + 1) < mg->get_levels().size()) {
         int merge_cnt = 0;
-        
-        const auto& levels = mg->get_levels();
+
+        const auto &levels = mg->get_levels();
         for (int n : levels[current_level]) {
             if (nodes_no_feasible_merge.count(n)) {
                 continue;
             }
-            
+
             // Get successors at next level that are not excluded
             std::unordered_set<int> unique_successors;
             std::vector<int> successors;
-            const auto& node_to_level = mg->get_node_to_level();
+            const auto &node_to_level = mg->get_node_to_level();
             for (int succ : mg->get_node_successors(n)) {
                 if ((!exclude_part_ids.contains(succ)) &&
                     node_to_level.at(succ) == current_level + 1 && node_id_to_part.contains(succ)) {
@@ -454,9 +475,10 @@ int PartitionMerger::merge_siblings() {
 
             // Sort by live vars (smallest first)
             std::sort(successors.begin(), successors.end(), [&](int a, int b) {
-                return node_id_to_part.at(a)->get_max_live_vars() < node_id_to_part.at(b)->get_max_live_vars();
+                return node_id_to_part.at(a)->get_max_live_vars() <
+                       node_id_to_part.at(b)->get_max_live_vars();
             });
-            
+
             if (successors.size() < 2) {
                 nodes_no_feasible_merge.insert(n);
                 continue;
@@ -467,7 +489,7 @@ int PartitionMerger::merge_siblings() {
             for (int succ : successors) {
                 successors_live_vars.push_back(node_id_to_part.at(succ)->get_max_live_vars());
             }
-            
+
             while (successors.size() > 1) {
                 int total_live_vars = 0;
                 for (int vars : successors_live_vars) {
@@ -481,17 +503,17 @@ int PartitionMerger::merge_siblings() {
                     successors_live_vars.pop_back();
                 }
             }
-            
+
             if (successors.size() <= 2) {
                 nodes_no_feasible_merge.insert(n);
                 continue;
             }
-            
+
             // Try to merge successors
             while (successors.size() >= 2) {
                 int to = successors[0];
                 std::vector<int> from_nodes(successors.begin() + 1, successors.end());
-                
+
                 if (try_merge_upart_nodes(to, from_nodes, true)) {
                     merge_cnt++;
                     break;
@@ -500,7 +522,7 @@ int PartitionMerger::merge_siblings() {
                 }
             }
         }
-        
+
         if (merge_cnt != 0) {
             total_merge_cnt += merge_cnt;
         } else {
@@ -510,30 +532,29 @@ int PartitionMerger::merge_siblings() {
             mg->levelize();
         }
     }
-    
+
     return total_merge_cnt;
 }
 
 int PartitionMerger::merge_same_level() {
     check_mg();
-    
+
     int total_merge_cnt = 0;
     int current_level = 0;
-    
+
     while (static_cast<size_t>(current_level + 1) < mg->get_levels().size()) {
         int merge_cnt = 0;
-        
-        const auto& levels = mg->get_levels();
-        
+
+        const auto &levels = mg->get_levels();
+
         // Get valid nodes at current level (not excluded, with live vars < 32)
         std::vector<int> nodes_valid;
         for (int n : levels[current_level]) {
-            if (node_id_to_part.contains(n) && 
-                (!exclude_part_ids.contains(n))) {
+            if (node_id_to_part.contains(n) && (!exclude_part_ids.contains(n))) {
                 nodes_valid.push_back(n);
             }
         }
-        
+
         // Filter nodes with live vars < 32
         std::vector<int> nodes_to_consider;
         for (int n : nodes_valid) {
@@ -541,17 +562,18 @@ int PartitionMerger::merge_same_level() {
                 nodes_to_consider.push_back(n);
             }
         }
-        
+
         // Sort by live vars (smallest first)
         std::sort(nodes_to_consider.begin(), nodes_to_consider.end(), [&](int a, int b) {
-            return node_id_to_part.at(a)->get_max_live_vars() < node_id_to_part.at(b)->get_max_live_vars();
+            return node_id_to_part.at(a)->get_max_live_vars() <
+                   node_id_to_part.at(b)->get_max_live_vars();
         });
-        
+
         // Try to merge pairs
         while (nodes_to_consider.size() > 1) {
             int largest_node_id = nodes_to_consider.back();
             int smallest_node_id = nodes_to_consider.front();
-            
+
             if (try_merge_upart_nodes(largest_node_id, {smallest_node_id}, false)) {
                 merge_cnt++;
                 nodes_to_consider.erase(nodes_to_consider.begin()); // Remove smallest
@@ -559,7 +581,7 @@ int PartitionMerger::merge_same_level() {
                 nodes_to_consider.pop_back(); // Remove largest
             }
         }
-        
+
         if (merge_cnt != 0) {
             total_merge_cnt += merge_cnt;
         } else {
@@ -568,18 +590,19 @@ int PartitionMerger::merge_same_level() {
             mg->levelize();
         }
     }
-    
+
     return total_merge_cnt;
 }
 
 void PartitionMerger::check_mg() const {
-    for ([[maybe_unused]] const auto& pair : node_id_to_part) {
+    for ([[maybe_unused]] const auto &pair : node_id_to_part) {
         assert(pair.second->get_max_live_vars() != -1);
     }
     mg->check_graph();
 }
 
-bool PartitionMerger::try_merge_upart_nodes(int to, const std::vector<int>& from_nodes, bool check_acyclic) {
+bool PartitionMerger::try_merge_upart_nodes(int to, const std::vector<int> &from_nodes,
+                                            bool check_acyclic) {
     std::unordered_set<int> all_nodes = {to};
     all_nodes.insert(from_nodes.begin(), from_nodes.end());
     assert(all_nodes.size() == (from_nodes.size() + 1));
@@ -599,7 +622,7 @@ bool PartitionMerger::try_merge_upart_nodes(int to, const std::vector<int>& from
     auto new_part = std::make_unique<MicroPartition>(*node_id_to_part[to]);
     std::unordered_set<int> new_nodes;
     for (int n : from_nodes) {
-        const auto& from_part = node_id_to_part[n];
+        const auto &from_part = node_id_to_part[n];
         new_nodes.insert(from_part->get_nodes().begin(), from_part->get_nodes().end());
     }
 

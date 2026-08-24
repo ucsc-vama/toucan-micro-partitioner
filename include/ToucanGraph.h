@@ -1,10 +1,10 @@
 #pragma once
 
-#include <vector>
+#include <memory>
+#include <string>
 #include <unordered_map>
 #include <unordered_set>
-#include <string>
-#include <memory>
+#include <vector>
 
 enum class NodeTag : uint8_t {
     ConstDecl = 0,
@@ -24,8 +24,8 @@ enum class NodeTag : uint8_t {
 };
 
 // Utility functions for NodeTag
-NodeTag string_to_node_tag(const std::string& str);
-const char* node_tag_to_string(NodeTag tag);
+NodeTag string_to_node_tag(const std::string &str);
+const char *node_tag_to_string(NodeTag tag);
 bool is_valid_node_tag(NodeTag tag);
 bool is_exclude_node_tag(NodeTag tag);
 bool is_merge_result_node_tag(NodeTag tag);
@@ -34,30 +34,32 @@ struct NodeAttributes {
     NodeTag tag;
     int weight;
     int level_id = -1;
-    int original_vec_decl = -1;  // For VecDecl_LUT_NOP nodes
+    int original_vec_decl = -1; // For VecDecl_LUT_NOP nodes
 };
 
 class ToucanGraph {
-public:
+  public:
     ToucanGraph();
     ~ToucanGraph() = default;
 
     // Core functionality
-    void load(const std::string& file_path);
+    void load(const std::string &file_path);
     void levelize();
     bool is_acyclic() const;
     bool is_levelized() const { return !levels.empty(); }
 
     // Graph manipulation
-    void expand_VecDecl(const std::unordered_map<int, std::vector<int>>& vecDeclElements);
+    void expand_VecDecl(const std::unordered_map<int, std::vector<int>> &vecDeclElements);
     void remove_ConstDecl();
-    void save_vector_def_info(const std::string& filename) const;
+    void save_vector_def_info(const std::string &filename) const;
 
     // Accessors
-    const std::unordered_map<int, NodeAttributes>& get_nodes() const { return nodes; }
-    const std::unordered_map<int, std::vector<int>>& get_adjacency_list() const { return adjacency_list; }
-    const std::vector<std::vector<int>>& get_levels() const { return levels; }
-    
+    const std::unordered_map<int, NodeAttributes> &get_nodes() const { return nodes; }
+    const std::unordered_map<int, std::vector<int>> &get_adjacency_list() const {
+        return adjacency_list;
+    }
+    const std::vector<std::vector<int>> &get_levels() const { return levels; }
+
     // Graph queries
     std::vector<int> get_predecessors(int node) const;
     std::vector<int> get_successors(int node) const;
@@ -70,19 +72,20 @@ public:
     int max_node() const;
 
     // Subgraph creation
-    std::unique_ptr<ToucanGraph> create_subgraph(const std::unordered_set<int>& node_list) const;
+    std::unique_ptr<ToucanGraph> create_subgraph(const std::unordered_set<int> &node_list) const;
 
-private:
+  private:
     std::unordered_map<int, NodeAttributes> nodes;
-    std::unordered_map<int, std::vector<int>> adjacency_list;  // node -> list of successors
-    std::unordered_map<int, std::vector<int>> reverse_adjacency_list;  // node -> list of predecessors
+    std::unordered_map<int, std::vector<int>> adjacency_list; // node -> list of successors
+    std::unordered_map<int, std::vector<int>>
+        reverse_adjacency_list; // node -> list of predecessors
     std::vector<std::vector<int>> levels;
     std::unordered_map<int, std::vector<int>> vecdecl_to_nop;
     int max_node_id = 0;
     size_t edge_count = 0;
 
-    void add_node(int node_id, const NodeAttributes& attrs);
+    void add_node(int node_id, const NodeAttributes &attrs);
     void add_edge(int from, int to);
     void remove_node(int node_id);
-    void remove_nodes(const std::vector<int>& nodes_to_remove);
+    void remove_nodes(const std::vector<int> &nodes_to_remove);
 };

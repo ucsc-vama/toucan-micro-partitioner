@@ -1,19 +1,19 @@
 #pragma once
 
-#include <vector>
+#include <cstddef>
 #include <unordered_map>
 #include <unordered_set>
-#include <cstddef>
+#include <vector>
 
 class MergeGraph {
-public:
+  public:
     MergeGraph();
     ~MergeGraph() = default;
 
     // Node management
     int add_node();
     void add_edge(int source, int target);
-    void add_edges(const std::vector<std::pair<int, int>>& edges);
+    void add_edges(const std::vector<std::pair<int, int>> &edges);
 
     // Graph queries
     std::vector<int> get_node_successors(int node) const;
@@ -24,20 +24,20 @@ public:
     int max_node() const;
 
     // Graph operations
-    bool merge_is_acyclic(const std::unordered_set<int>& nodes_to_merge);
-    void merge_nodes(int to, const std::vector<int>& from_list);
+    bool merge_is_acyclic(const std::unordered_set<int> &nodes_to_merge);
+    void merge_nodes(int to, const std::vector<int> &from_list);
     void graph_gc();
     void edge_dedup();
     void check_graph() const;
     void levelize();
 
     // Accessors
-    const std::vector<std::vector<int>>& get_levels() const { return levels; }
-    const std::unordered_map<int, int>& get_node_to_level() const { return node_to_level; }
+    const std::vector<std::vector<int>> &get_levels() const { return levels; }
+    const std::unordered_map<int, int> &get_node_to_level() const { return node_to_level; }
 
-private:
-    std::unordered_map<int, std::vector<int>> adjacency_list;  // node -> successors
-    std::unordered_map<int, std::vector<int>> reverse_adjacency_list;  // node -> predecessors
+  private:
+    std::unordered_map<int, std::vector<int>> adjacency_list;         // node -> successors
+    std::unordered_map<int, std::vector<int>> reverse_adjacency_list; // node -> predecessors
     int next_id = 0;
     std::vector<std::vector<int>> levels;
     std::unordered_map<int, int> node_to_level;
