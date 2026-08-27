@@ -429,29 +429,6 @@ NodeID ToucanGraph::max_node() const {
     return max_id;
 }
 
-std::unique_ptr<ToucanGraph>
-ToucanGraph::create_subgraph(const std::unordered_set<NodeID> &node_list) const {
-    auto subgraph = std::make_unique<ToucanGraph>();
-
-    // Add nodes
-    for (NodeID node : node_list) {
-        if (has_node(node)) {
-            subgraph->add_node(node, nodes.at(node));
-        }
-    }
-
-    // Add edges
-    for (NodeID node : node_list) {
-        for (NodeID successor : get_successors(node)) {
-            if (node_list.count(successor)) {
-                subgraph->add_edge(node, successor);
-            }
-        }
-    }
-
-    return subgraph;
-}
-
 void ToucanGraph::add_node(NodeID node_id, const NodeAttributes &attrs) {
     nodes[node_id] = attrs;
     adjacency_list[node_id] = {};

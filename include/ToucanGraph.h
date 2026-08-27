@@ -72,9 +72,6 @@ class ToucanGraph {
     size_t num_edges() const { return edge_count; }
     NodeID max_node() const;
 
-    // Subgraph creation
-    std::unique_ptr<ToucanGraph> create_subgraph(const std::unordered_set<NodeID> &node_list) const;
-
   private:
     std::unordered_map<NodeID, NodeAttributes> nodes;
     std::unordered_map<NodeID, std::vector<NodeID>> adjacency_list; // node -> list of successors
