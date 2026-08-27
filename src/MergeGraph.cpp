@@ -205,16 +205,15 @@ void MergeGraph::graph_gc() {
 }
 
 void MergeGraph::edge_dedup() {
-    // Remove parallel edges by converting vectors to sets and back
+    // Sort each adjacency list, then remove parallel edges in place.
     for (NodeID node = 0; node < next_id; ++node) {
         if (!active[node]) {
             continue;
         }
         auto &successors = adjacency_list[node];
         if (successors.size() > 1) {
-            std::unordered_set<NodeID> unique_successors(successors.begin(), successors.end());
-            successors.assign(unique_successors.begin(), unique_successors.end());
             std::sort(successors.begin(), successors.end());
+            successors.erase(std::unique(successors.begin(), successors.end()), successors.end());
         }
     }
 
@@ -225,9 +224,8 @@ void MergeGraph::edge_dedup() {
         }
         auto &predecessors = reverse_adjacency_list[node];
         if (predecessors.size() > 1) {
-            std::unordered_set<NodeID> unique_predecessors(predecessors.begin(), predecessors.end());
-            predecessors.assign(unique_predecessors.begin(), unique_predecessors.end());
             std::sort(predecessors.begin(), predecessors.end());
+            predecessors.erase(std::unique(predecessors.begin(), predecessors.end()), predecessors.end());
         }
     }
 }
