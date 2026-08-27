@@ -10,26 +10,6 @@
 
 MicroPartition::MicroPartition(const ToucanGraph *graph) : G(graph) {}
 
-MicroPartition::MicroPartition(const MicroPartition &other)
-    : G(other.G), nodes(other.nodes), levels(other.levels), node_levels(other.node_levels),
-      var_life_cycle(other.var_life_cycle), max_live_vars(other.max_live_vars),
-      num_input_vars(other.num_input_vars), num_output_vars(other.num_output_vars) {}
-
-MicroPartition &MicroPartition::operator=(const MicroPartition &other) {
-    if (this != &other) {
-        G = other.G;
-        // excluded_nodes = other.excluded_nodes;
-        nodes = other.nodes;
-        levels = other.levels;
-        node_levels = other.node_levels;
-        var_life_cycle = other.var_life_cycle;
-        max_live_vars = other.max_live_vars;
-        num_input_vars = other.num_input_vars;
-        num_output_vars = other.num_output_vars;
-    }
-    return *this;
-}
-
 void MicroPartition::calculate_node_level() {
     for ([[maybe_unused]] NodeID node : nodes) {
         // assert(excluded_nodes.find(node) == excluded_nodes.end());

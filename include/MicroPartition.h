@@ -12,9 +12,8 @@ class MicroPartition {
     MicroPartition(const ToucanGraph *graph);
     ~MicroPartition() = default;
 
-    // Copy constructor and assignment
-    MicroPartition(const MicroPartition &other);
-    MicroPartition &operator=(const MicroPartition &other);
+    MicroPartition(const MicroPartition &) = default;
+    MicroPartition &operator=(const MicroPartition &) = default;
 
     // Core functionality
     bool check_correctness();
@@ -30,7 +29,6 @@ class MicroPartition {
 
   private:
     const ToucanGraph *G;
-    // std::unordered_set<int> excluded_nodes;
     std::unordered_set<NodeID> nodes;
     std::vector<std::vector<NodeID>> levels;
     std::unordered_map<NodeID, int> node_levels;

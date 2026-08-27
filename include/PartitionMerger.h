@@ -33,7 +33,7 @@ class PartitionMerger {
     void print_mp_vtx_cnt();
 
   private:
-    std::unique_ptr<MergeGraph> mg;
+    mutable MergeGraph mg;
     const ToucanGraph &G;
     std::unordered_set<NodeID> exclude_nodes;
     std::unordered_set<NodeID> exclude_part_ids;

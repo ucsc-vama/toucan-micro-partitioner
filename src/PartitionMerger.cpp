@@ -7,23 +7,21 @@
 
 PartitionMerger::PartitionMerger(const ToucanGraph &G,
                                  const std::unordered_set<NodeID> &exclude_nodes)
-    : G(G), exclude_nodes(exclude_nodes) {
-    mg = std::make_unique<MergeGraph>();
-}
+    : G(G), exclude_nodes(exclude_nodes) {}
 
 void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroPartition>> &parts) {
-    mg->reserve_nodes(parts.size() + exclude_nodes.size());
+    mg.reserve_nodes(parts.size() + exclude_nodes.size());
 
     // Add nodes for all parts
     for (size_t i = 0; i < parts.size(); ++i) {
-        NodeID part_id = mg->add_node();
+        NodeID part_id = mg.add_node();
         assert(part_id == static_cast<NodeID>(i));
         node_id_to_part[part_id] = std::make_unique<MicroPartition>(*parts[i]);
     }
 
     // Add exclude parts
     for (NodeID n : exclude_nodes) {
-        NodeID part_id = mg->add_node();
+        NodeID part_id = mg.add_node();
         exclude_part_ids.insert(part_id);
         exclude_id_to_nodes[part_id] = {n};
     }
@@ -88,17 +86,17 @@ void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroParti
         }
     }
 
-    mg->add_edges(edges_to_add);
+    mg.add_edges(edges_to_add);
 
     // Note: should not have parallel edge. though using std::unordered_set may be a good option, do
     // manual hack for memory usage.
-    mg->edge_dedup();
+    mg.edge_dedup();
 }
 
 void PartitionMerger::print_part_stat() const {
-    mg->levelize();
+    mg.levelize();
 
-    int max_levels = mg->get_levels().size();
+    int max_levels = mg.get_levels().size();
 
     std::vector<int> norm_part_size;
     std::vector<int> norm_part_depth;
@@ -169,7 +167,7 @@ void PartitionMerger::print_part_stat() const {
 }
 
 int PartitionMerger::get_mp_vtx_cnt() {
-    const auto &levels = mg->get_levels();
+    const auto &levels = mg.get_levels();
     std::unordered_set<NodeID> allMPVtxes;
 
     for (size_t level_id = 0; level_id < levels.size(); ++level_id) {
@@ -194,7 +192,7 @@ int PartitionMerger::get_mp_vtx_cnt() {
 }
 
 void PartitionMerger::print_mp_vtx_cnt() {
-    const auto &levels = mg->get_levels();
+    const auto &levels = mg.get_levels();
     std::unordered_set<NodeID> allMPVtxes, allExcludeVtxes;
 
     for (size_t level_id = 0; level_id < levels.size(); ++level_id) {
@@ -224,14 +222,14 @@ void PartitionMerger::print_mp_vtx_cnt() {
 }
 
 void PartitionMerger::save(const std::string &filename) const {
-    mg->levelize();
+    mg.levelize();
 
     std::ofstream out(filename);
     if (!out.is_open()) {
         throw std::runtime_error("Cannot open file for writing: " + filename);
     }
 
-    const auto &levels = mg->get_levels();
+    const auto &levels = mg.get_levels();
     for (size_t level_id = 0; level_id < levels.size(); ++level_id) {
         const auto &level_nodes = levels[level_id];
         out << "L " << level_id << "\n";
@@ -289,7 +287,7 @@ int PartitionMerger::merge_direct_child() {
             continue;
         }
 
-        const auto &merge_froms = mg->get_node_successors(merge_to);
+        const auto &merge_froms = mg.get_node_successors(merge_to);
         if (merge_froms.size() != 1) {
             continue;
         }
@@ -299,7 +297,7 @@ int PartitionMerger::merge_direct_child() {
             continue;
         }
 
-        const auto &node_to_level = mg->get_node_to_level();
+        const auto &node_to_level = mg.get_node_to_level();
         int merge_to_level = node_to_level.at(merge_to);
         int merge_from_level = node_to_level.at(merge_from);
 
@@ -327,9 +325,9 @@ int PartitionMerger::merge_direct_child() {
         }
     }
 
-    mg->graph_gc();
-    assert(node_id_to_part.size() == mg->num_nodes() - exclude_part_ids.size());
-    mg->check_graph();
+    mg.graph_gc();
+    assert(node_id_to_part.size() == mg.num_nodes() - exclude_part_ids.size());
+    mg.check_graph();
 
     return merge_cnt;
 }
@@ -341,10 +339,10 @@ int PartitionMerger::merge_adjacent_group() {
     int iter_start_level = 0;
     bool graph_dirty = false;
 
-    while (static_cast<size_t>(iter_start_level + 1) < mg->get_levels().size()) {
+    while (static_cast<size_t>(iter_start_level + 1) < mg.get_levels().size()) {
         int merge_cnt = 0;
 
-        const auto &levels = mg->get_levels();
+        const auto &levels = mg.get_levels();
         const auto &level_nodes = levels[iter_start_level];
 
         std::unordered_set<NodeID> nodes_visited;
@@ -355,10 +353,10 @@ int PartitionMerger::merge_adjacent_group() {
                 continue;
             }
 
-            const auto &childs = mg->get_node_successors(each_node);
+            const auto &childs = mg.get_node_successors(each_node);
             std::unordered_set<NodeID> childs_next_level;
 
-            const auto &node_to_level = mg->get_node_to_level();
+            const auto &node_to_level = mg.get_node_to_level();
             for (NodeID child : childs) {
                 if (node_to_level.at(child) == iter_start_level + 1) {
                     childs_next_level.insert(child);
@@ -372,7 +370,7 @@ int PartitionMerger::merge_adjacent_group() {
             // Find all predecessors of children at this level
             std::unordered_set<NodeID> child_all_predecessors;
             for (NodeID c : childs_next_level) {
-                const auto &preds = mg->get_node_predecessors(c);
+                const auto &preds = mg.get_node_predecessors(c);
                 child_all_predecessors.insert(preds.begin(), preds.end());
             }
 
@@ -444,8 +442,8 @@ int PartitionMerger::merge_adjacent_group() {
         }
 
         if (graph_dirty) {
-            mg->graph_gc();
-            mg->levelize();
+            mg.graph_gc();
+            mg.levelize();
             graph_dirty = false;
         }
     }
@@ -458,13 +456,13 @@ int PartitionMerger::merge_siblings() {
 
     int total_merge_cnt = 0;
     int current_level = 0;
-    std::vector<bool> nodes_no_feasible_merge(mg->node_id_capacity());
+    std::vector<bool> nodes_no_feasible_merge(mg.node_id_capacity());
     bool graph_dirty = false;
 
-    while (static_cast<size_t>(current_level + 1) < mg->get_levels().size()) {
+    while (static_cast<size_t>(current_level + 1) < mg.get_levels().size()) {
         int merge_cnt = 0;
 
-        const auto &levels = mg->get_levels();
+        const auto &levels = mg.get_levels();
         for (NodeID n : levels[current_level]) {
             if (nodes_no_feasible_merge[n]) {
                 continue;
@@ -473,8 +471,8 @@ int PartitionMerger::merge_siblings() {
             // Get successors at next level that are not excluded
             std::unordered_set<NodeID> unique_successors;
             std::vector<NodeID> successors;
-            const auto &node_to_level = mg->get_node_to_level();
-            for (NodeID succ : mg->get_node_successors(n)) {
+            const auto &node_to_level = mg.get_node_to_level();
+            for (NodeID succ : mg.get_node_successors(n)) {
                 if ((!exclude_part_ids.contains(succ)) &&
                     node_to_level.at(succ) == current_level + 1 && node_id_to_part.contains(succ)) {
                     unique_successors.insert(succ);
@@ -513,7 +511,7 @@ int PartitionMerger::merge_siblings() {
                 }
             }
 
-            if (successors.size() <= 2) {
+            if (successors.size() < 2) {
                 nodes_no_feasible_merge[n] = true;
                 continue;
             }
@@ -539,8 +537,8 @@ int PartitionMerger::merge_siblings() {
             current_level++;
             std::fill(nodes_no_feasible_merge.begin(), nodes_no_feasible_merge.end(), false);
             if (graph_dirty) {
-                mg->graph_gc();
-                mg->levelize();
+                mg.graph_gc();
+                mg.levelize();
                 graph_dirty = false;
             }
         }
@@ -556,10 +554,10 @@ int PartitionMerger::merge_same_level() {
     int current_level = 0;
     bool graph_dirty = false;
 
-    while (static_cast<size_t>(current_level + 1) < mg->get_levels().size()) {
+    while (static_cast<size_t>(current_level + 1) < mg.get_levels().size()) {
         int merge_cnt = 0;
 
-        const auto &levels = mg->get_levels();
+        const auto &levels = mg.get_levels();
 
         // Get valid nodes at current level (not excluded, with live vars below the warp size)
         std::vector<NodeID> nodes_valid;
@@ -602,8 +600,8 @@ int PartitionMerger::merge_same_level() {
         } else {
             current_level++;
             if (graph_dirty) {
-                mg->graph_gc();
-                mg->levelize();
+                mg.graph_gc();
+                mg.levelize();
                 graph_dirty = false;
             }
         }
@@ -616,7 +614,7 @@ void PartitionMerger::check_mg() const {
     for ([[maybe_unused]] const auto &pair : node_id_to_part) {
         assert(pair.second->get_max_live_vars() != -1);
     }
-    mg->check_graph();
+    mg.check_graph();
 }
 
 bool PartitionMerger::try_merge_upart_nodes(NodeID to, const std::vector<NodeID> &from_nodes,
@@ -626,7 +624,7 @@ bool PartitionMerger::try_merge_upart_nodes(NodeID to, const std::vector<NodeID>
     assert(all_nodes.size() == (from_nodes.size() + 1));
 
     if (check_acyclic) {
-        if (!mg->merge_is_acyclic(all_nodes)) {
+        if (!mg.merge_is_acyclic(all_nodes)) {
             return false;
         }
     }
@@ -651,7 +649,7 @@ bool PartitionMerger::try_merge_upart_nodes(NodeID to, const std::vector<NodeID>
 
     // OK to merge
     node_id_to_part[to] = std::move(new_part);
-    mg->merge_nodes(to, from_nodes);
+    mg.merge_nodes(to, from_nodes);
 
     for (NodeID n : from_nodes) {
         node_id_to_part.erase(n);
