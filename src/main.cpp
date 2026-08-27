@@ -12,7 +12,6 @@ struct Args {
     std::string vector;
     std::string output;
     std::string vecmap;
-    int max_part_size = 99999;
 };
 
 Args parse_args(int argc, char *argv[]) {
@@ -29,15 +28,12 @@ Args parse_args(int argc, char *argv[]) {
             args.output = argv[++i];
         } else if (arg == "--vecmap" && i + 1 < argc) {
             args.vecmap = argv[++i];
-        } else if (arg == "--max-part-size" && i + 1 < argc) {
-            args.max_part_size = std::stoi(argv[++i]);
         }
     }
 
     if (args.graph.empty() || args.vector.empty() || args.output.empty() || args.vecmap.empty()) {
         std::cerr << "Usage: " << argv[0]
-                  << " --graph <file> --vector <file> --output <file> --vecmap <file> "
-                     "[--max-part-size <size>]\n";
+                  << " --graph <file> --vector <file> --output <file> --vecmap <file>\n";
         exit(1);
     }
 

@@ -33,7 +33,7 @@ make
 ## Usage
 
 ```bash
-./micro_partitioner --graph <graph_file> --vector <vector_file> --output <output_file> --vecmap <vecmap_file> [--max-part-size <size>]
+./micro_partitioner --graph <graph_file> --vector <vector_file> --output <output_file> --vecmap <vecmap_file>
 ```
 
 ### Parameters
@@ -42,7 +42,6 @@ make
 - `--vector`: Vector information file
 - `--output`: Output partition file
 - `--vecmap`: Output vector mapping file
-- `--max-part-size`: Maximum partition size (default: 99999)
 
 ## Input Format
 
