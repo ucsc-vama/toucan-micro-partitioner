@@ -22,6 +22,7 @@ class MergeGraph {
     int get_node_in_degree(NodeID node) const;
     bool has_node(NodeID node) const;
     size_t num_nodes() const { return live_node_count; }
+    size_t node_id_capacity() const { return adjacency_list.size(); }
 
     // Graph operations
     bool merge_is_acyclic(const std::unordered_set<NodeID> &nodes_to_merge);

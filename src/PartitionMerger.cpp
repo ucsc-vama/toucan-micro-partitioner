@@ -458,7 +458,7 @@ int PartitionMerger::merge_siblings() {
 
     int total_merge_cnt = 0;
     int current_level = 0;
-    std::unordered_set<NodeID> nodes_no_feasible_merge;
+    std::vector<bool> nodes_no_feasible_merge(mg->node_id_capacity());
     bool graph_dirty = false;
 
     while (static_cast<size_t>(current_level + 1) < mg->get_levels().size()) {
@@ -466,7 +466,7 @@ int PartitionMerger::merge_siblings() {
 
         const auto &levels = mg->get_levels();
         for (NodeID n : levels[current_level]) {
-            if (nodes_no_feasible_merge.count(n)) {
+            if (nodes_no_feasible_merge[n]) {
                 continue;
             }
 
@@ -489,7 +489,7 @@ int PartitionMerger::merge_siblings() {
             });
 
             if (successors.size() < 2) {
-                nodes_no_feasible_merge.insert(n);
+                nodes_no_feasible_merge[n] = true;
                 continue;
             }
 
@@ -514,7 +514,7 @@ int PartitionMerger::merge_siblings() {
             }
 
             if (successors.size() <= 2) {
-                nodes_no_feasible_merge.insert(n);
+                nodes_no_feasible_merge[n] = true;
                 continue;
             }
 
@@ -537,7 +537,7 @@ int PartitionMerger::merge_siblings() {
             graph_dirty = true;
         } else {
             current_level++;
-            nodes_no_feasible_merge.clear();
+            std::fill(nodes_no_feasible_merge.begin(), nodes_no_feasible_merge.end(), false);
             if (graph_dirty) {
                 mg->graph_gc();
                 mg->levelize();
