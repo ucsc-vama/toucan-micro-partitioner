@@ -162,65 +162,57 @@ void MicroPartition::collect_variable_liveness() {
 bool MicroPartition::check_liveness_constraint() {
     assert(!var_life_cycle.empty());
 
-    std::unordered_map<int, std::unordered_set<NodeID>> level_var_active;
-    std::unordered_map<int, std::unordered_set<NodeID>> level_var_deactive;
+    std::vector<int> activations(levels.size(), 0);
+    std::vector<int> deactivations(levels.size(), 0);
+    int initial_live_vars = 0;
+    int final_live_vars = 0;
 
     for (const auto &pair : var_life_cycle) {
-        NodeID var = pair.first;
         int life_start = pair.second.first;
         int life_end = pair.second.second;
 
-        level_var_active[life_start].insert(var);
-        level_var_deactive[life_end].insert(var);
+        if (life_start == -1) {
+            initial_live_vars++;
+        } else {
+            assert(life_start >= 0 && static_cast<size_t>(life_start) < levels.size());
+            activations[life_start]++;
+        }
+
+        if (life_end == PART_MAX_LEVEL) {
+            final_live_vars++;
+        } else {
+            assert(life_end >= 0 && static_cast<size_t>(life_end) < levels.size());
+            deactivations[life_end]++;
+        }
     }
 
-    // External vars
-    std::unordered_set<NodeID> current_live_vars;
-    if (level_var_active.count(-1)) {
-        current_live_vars = level_var_active[-1];
-    }
-
-    max_live_vars = current_live_vars.size();
-    num_input_vars = current_live_vars.size();
+    int current_live_vars = initial_live_vars;
+    max_live_vars = current_live_vars;
+    num_input_vars = current_live_vars;
 
     for (int level = 0; level < static_cast<int>(levels.size()); ++level) {
-        max_live_vars = std::max(static_cast<int>(current_live_vars.size()), max_live_vars);
+        max_live_vars = std::max(current_live_vars, max_live_vars);
 
-        if (current_live_vars.size() > GPU_WARP_SIZE) {
+        if (current_live_vars > GPU_WARP_SIZE) {
             return false;
         }
 
-        // Deactivate variables
-        if (level_var_deactive.count(level)) {
-            for (NodeID var : level_var_deactive[level]) {
-                assert(current_live_vars.count(var));
-                current_live_vars.erase(var);
-            }
-        }
-
-        // Activate variables
-        if (level_var_active.count(level)) {
-            for (NodeID var : level_var_active[level]) {
-                assert(current_live_vars.find(var) == current_live_vars.end());
-                current_live_vars.insert(var);
-            }
-        }
+        current_live_vars -= deactivations[level];
+        assert(current_live_vars >= 0);
+        current_live_vars += activations[level];
     }
 
     // Handle final variables
-    if (level_var_deactive.count(PART_MAX_LEVEL)) {
-        for ([[maybe_unused]] NodeID var : level_var_deactive[PART_MAX_LEVEL]) {
-            assert(current_live_vars.count(var));
-        }
-        assert(current_live_vars.size() == level_var_deactive[PART_MAX_LEVEL].size());
+    if (final_live_vars != 0) {
+        assert(current_live_vars == final_live_vars);
     } else {
-        assert(current_live_vars.empty());
+        assert(current_live_vars == 0);
     }
 
-    num_output_vars = current_live_vars.size();
-    max_live_vars = std::max(static_cast<int>(current_live_vars.size()), max_live_vars);
+    num_output_vars = current_live_vars;
+    max_live_vars = std::max(current_live_vars, max_live_vars);
 
-    if (current_live_vars.size() > GPU_WARP_SIZE) {
+    if (current_live_vars > GPU_WARP_SIZE) {
         return false;
     }
 
