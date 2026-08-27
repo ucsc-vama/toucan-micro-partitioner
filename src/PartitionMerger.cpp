@@ -339,6 +339,7 @@ int PartitionMerger::merge_adjacent_group() {
 
     int total_merge_cnt = 0;
     int iter_start_level = 0;
+    bool graph_dirty = false;
 
     while (static_cast<size_t>(iter_start_level + 1) < mg->get_levels().size()) {
         int merge_cnt = 0;
@@ -435,13 +436,17 @@ int PartitionMerger::merge_adjacent_group() {
             }
         }
 
-        mg->graph_gc();
-        mg->levelize();
-
         if (merge_cnt == 0) {
             iter_start_level++;
         } else {
             total_merge_cnt += merge_cnt;
+            graph_dirty = true;
+        }
+
+        if (graph_dirty) {
+            mg->graph_gc();
+            mg->levelize();
+            graph_dirty = false;
         }
     }
 
@@ -454,6 +459,7 @@ int PartitionMerger::merge_siblings() {
     int total_merge_cnt = 0;
     int current_level = 0;
     std::unordered_set<NodeID> nodes_no_feasible_merge;
+    bool graph_dirty = false;
 
     while (static_cast<size_t>(current_level + 1) < mg->get_levels().size()) {
         int merge_cnt = 0;
@@ -528,11 +534,15 @@ int PartitionMerger::merge_siblings() {
 
         if (merge_cnt != 0) {
             total_merge_cnt += merge_cnt;
+            graph_dirty = true;
         } else {
             current_level++;
             nodes_no_feasible_merge.clear();
-            mg->graph_gc();
-            mg->levelize();
+            if (graph_dirty) {
+                mg->graph_gc();
+                mg->levelize();
+                graph_dirty = false;
+            }
         }
     }
 
@@ -544,6 +554,7 @@ int PartitionMerger::merge_same_level() {
 
     int total_merge_cnt = 0;
     int current_level = 0;
+    bool graph_dirty = false;
 
     while (static_cast<size_t>(current_level + 1) < mg->get_levels().size()) {
         int merge_cnt = 0;
@@ -587,10 +598,14 @@ int PartitionMerger::merge_same_level() {
 
         if (merge_cnt != 0) {
             total_merge_cnt += merge_cnt;
+            graph_dirty = true;
         } else {
             current_level++;
-            mg->graph_gc();
-            mg->levelize();
+            if (graph_dirty) {
+                mg->graph_gc();
+                mg->levelize();
+                graph_dirty = false;
+            }
         }
     }
 
