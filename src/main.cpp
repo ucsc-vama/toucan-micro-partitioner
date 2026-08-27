@@ -81,12 +81,9 @@ int main(int argc, char *argv[]) {
 
         [[maybe_unused]] int nodes_in_all_mparts = merger.get_mp_vtx_cnt();
 
-        int merge_cnt = 0;
-
         // Multiple merge phases
         std::cout << "> Merge with child\n";
-        merge_cnt = merger.merge_direct_child();
-        // int merge_cnt = merger.merge_direct_child();
+        int merge_cnt = merger.merge_direct_child();
         std::cout << "Merged " << merge_cnt << " parts\n";
         merger.print_part_stat();
 

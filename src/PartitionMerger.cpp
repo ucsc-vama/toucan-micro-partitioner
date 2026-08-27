@@ -123,7 +123,7 @@ void PartitionMerger::print_part_stat() const {
     for (const auto &pair : exclude_id_to_nodes) {
         NodeID pid = pair.first;
         const auto &nodes = pair.second;
-        if (exclude_nodes.contains(pid)) {
+        if (exclude_part_ids.contains(pid)) {
             special_part_size.push_back(nodes.size());
             special_part_depth.push_back(1);
         }
