@@ -1,21 +1,46 @@
 #include "MergeGraph.h"
 #include <algorithm>
 #include <cassert>
+#include <cstdint>
 #include <functional>
-#include <iostream>
 #include <queue>
 #include <stdexcept>
 
-MergeGraph::MergeGraph() : next_id(0) {}
+namespace {
+enum VisitColor : uint8_t {
+    kUnvisited,
+    kVisiting,
+    kVisited,
+};
+} // namespace
+
+MergeGraph::MergeGraph() = default;
+
+void MergeGraph::reserve_nodes(size_t node_count) {
+    adjacency_list.reserve(node_count);
+    reverse_adjacency_list.reserve(node_count);
+    active.reserve(node_count);
+    node_to_level.reserve(node_count);
+    in_degree.reserve(node_count);
+    levelize_queue.reserve(node_count);
+    pending_removal.reserve(node_count);
+}
 
 int MergeGraph::add_node() {
     int node_id = next_id++;
-    adjacency_list[node_id] = {};
-    reverse_adjacency_list[node_id] = {};
+    adjacency_list.emplace_back();
+    reverse_adjacency_list.emplace_back();
+    active.push_back(true);
+    live_node_count++;
+    node_to_level.push_back(-1);
+    in_degree.push_back(0);
+    pending_removal.push_back(false);
     return node_id;
 }
 
 void MergeGraph::add_edge(int source, int target) {
+    assert(has_node(source));
+    assert(has_node(target));
     adjacency_list[source].push_back(target);
     reverse_adjacency_list[target].push_back(source);
 }
@@ -27,40 +52,25 @@ void MergeGraph::add_edges(const std::vector<std::pair<int, int>> &edges) {
 }
 
 std::vector<int> MergeGraph::get_node_successors(int node) const {
-    auto it = adjacency_list.find(node);
-    if (it != adjacency_list.end()) {
-        return it->second;
+    if (has_node(node)) {
+        return adjacency_list[node];
     }
     return {};
 }
 
 std::vector<int> MergeGraph::get_node_predecessors(int node) const {
-    auto it = reverse_adjacency_list.find(node);
-    if (it != reverse_adjacency_list.end()) {
-        return it->second;
+    if (has_node(node)) {
+        return reverse_adjacency_list[node];
     }
     return {};
 }
 
 int MergeGraph::get_node_in_degree(int node) const {
-    if (reverse_adjacency_list.contains(node)) {
-        return reverse_adjacency_list.at(node).size();
-    }
-    return 0;
+    return has_node(node) ? static_cast<int>(reverse_adjacency_list[node].size()) : 0;
 }
 
-bool MergeGraph::has_node(int node) const { return adjacency_list.contains(node); }
-
-int MergeGraph::max_node() const {
-    if (adjacency_list.empty()) {
-        return -1; // No nodes in graph
-    }
-
-    int max_id = -1;
-    for (const auto &pair : adjacency_list) {
-        max_id = std::max(max_id, pair.first);
-    }
-    return max_id;
+bool MergeGraph::has_node(int node) const {
+    return node >= 0 && static_cast<size_t>(node) < active.size() && active[node];
 }
 
 bool MergeGraph::merge_is_acyclic(const std::unordered_set<int> &nodes_to_merge) {
@@ -68,17 +78,17 @@ bool MergeGraph::merge_is_acyclic(const std::unordered_set<int> &nodes_to_merge)
         levelize();
     }
 
-    // Group nodes by level
+    // Merge candidates are small, so a vector avoids a hash allocation here.
     std::vector<std::pair<int, std::vector<int>>> node_groups_by_level;
-    std::unordered_map<int, std::vector<int>> level_to_nodes;
-
     for (int node : nodes_to_merge) {
-        int level = node_to_level[node];
-        level_to_nodes[level].push_back(node);
-    }
-
-    for (const auto &pair : level_to_nodes) {
-        node_groups_by_level.emplace_back(pair.first, pair.second);
+        int level = node_to_level.at(node);
+        auto group_it = std::find_if(node_groups_by_level.begin(), node_groups_by_level.end(),
+                                     [level](const auto &group) { return group.first == level; });
+        if (group_it == node_groups_by_level.end()) {
+            node_groups_by_level.emplace_back(level, std::vector<int>{node});
+        } else {
+            group_it->second.push_back(node);
+        }
     }
 
     std::sort(node_groups_by_level.begin(), node_groups_by_level.end());
@@ -88,10 +98,7 @@ bool MergeGraph::merge_is_acyclic(const std::unordered_set<int> &nodes_to_merge)
     }
 
     // Check for external paths between different levels
-    for (size_t i = 0; i < node_groups_by_level.size(); ++i) {
-        int source_level = node_groups_by_level[i].first;
-        const std::vector<int> &source_nodes = node_groups_by_level[i].second;
-
+    for (const auto &[source_level, source_nodes] : node_groups_by_level) {
         std::unordered_set<int> visited;
         std::queue<int> queue;
 
@@ -105,25 +112,20 @@ bool MergeGraph::merge_is_acyclic(const std::unordered_set<int> &nodes_to_merge)
             int current = queue.front();
             queue.pop();
 
-            if (adjacency_list.contains(current)) {
-                for (auto &successor : adjacency_list[current]) {
-                    if (visited.count(successor))
-                        continue;
+            for (int successor : adjacency_list[current]) {
+                if (visited.count(successor))
+                    continue;
 
-                    // Check if this successor is in nodes_to_merge but at a
-                    // different level
-                    if (nodes_to_merge.count(successor)) {
-                        int succ_level = node_to_level[successor];
-                        if (succ_level != source_level) {
-                            // Found external path between merge nodes at
-                            // different levels
-                            return false;
-                        }
-                    } else {
-                        // Continue BFS through external nodes
-                        visited.insert(successor);
-                        queue.push(successor);
+                // Check if this successor is in nodes_to_merge but at a different level
+                if (nodes_to_merge.count(successor)) {
+                    int succ_level = node_to_level[successor];
+                    if (succ_level != source_level) {
+                        return false;
                     }
+                } else {
+                    // Continue BFS through external nodes
+                    visited.insert(successor);
+                    queue.push(successor);
                 }
             }
         }
@@ -165,12 +167,17 @@ void MergeGraph::merge_nodes(int to, const std::vector<int> &from_list) {
 
     // Remove the merged nodes
     for (int from_node : from_list) {
-        nodes_to_remove.insert(from_node);
+        if (!pending_removal[from_node]) {
+            pending_removal[from_node] = true;
+            nodes_to_remove.push_back(from_node);
+        }
     }
 }
 
 void MergeGraph::graph_gc() {
     for (int node : nodes_to_remove) {
+        assert(has_node(node));
+
         // Remove all edges involving this node
         for (int pred : get_node_predecessors(node)) {
             auto &successors = adjacency_list[pred];
@@ -184,9 +191,12 @@ void MergeGraph::graph_gc() {
                                predecessors.end());
         }
 
-        // Remove node from adjacency lists
-        adjacency_list.erase(node);
-        reverse_adjacency_list.erase(node);
+        // Free the adjacency storage for removed nodes while preserving their stable IDs.
+        std::vector<int>().swap(adjacency_list[node]);
+        std::vector<int>().swap(reverse_adjacency_list[node]);
+        pending_removal[node] = false;
+        active[node] = false;
+        live_node_count--;
     }
 
     nodes_to_remove.clear();
@@ -194,25 +204,27 @@ void MergeGraph::graph_gc() {
 
 void MergeGraph::edge_dedup() {
     // Remove parallel edges by converting vectors to sets and back
-    for (auto &pair : adjacency_list) {
-        auto &successors = pair.second;
+    for (int node = 0; node < next_id; ++node) {
+        if (!active[node]) {
+            continue;
+        }
+        auto &successors = adjacency_list[node];
         if (successors.size() > 1) {
-            // Convert to set to remove duplicates, then back to vector
             std::unordered_set<int> unique_successors(successors.begin(), successors.end());
             successors.assign(unique_successors.begin(), unique_successors.end());
-            // Sort for consistent ordering
             std::sort(successors.begin(), successors.end());
         }
     }
 
     // Do the same for reverse adjacency list
-    for (auto &pair : reverse_adjacency_list) {
-        auto &predecessors = pair.second;
+    for (int node = 0; node < next_id; ++node) {
+        if (!active[node]) {
+            continue;
+        }
+        auto &predecessors = reverse_adjacency_list[node];
         if (predecessors.size() > 1) {
-            // Convert to set to remove duplicates, then back to vector
             std::unordered_set<int> unique_predecessors(predecessors.begin(), predecessors.end());
             predecessors.assign(unique_predecessors.begin(), unique_predecessors.end());
-            // Sort for consistent ordering
             std::sort(predecessors.begin(), predecessors.end());
         }
     }
@@ -225,101 +237,79 @@ void MergeGraph::check_graph() const {
 }
 
 void MergeGraph::levelize() {
-    levels.clear();
-    node_to_level.clear();
+    assert(live_node_count != 0);
 
-    // Calculate in-degrees
-    auto max_node_id = max_node();
-    assert(max_node_id >= 0);
-    std::vector<int> in_degree;
-    in_degree.resize(max_node_id + 1, -1);
-    // std::unordered_map<int, int> in_degree;
-    // in_degree.reserve(adjacency_list.size());
-    for (const auto &pair : adjacency_list) {
-        int node = pair.first;
-        assert(static_cast<size_t>(node) < in_degree.size());
-        in_degree[node] = get_node_in_degree(node);
-    }
-
-    // Topological sort using Kahn's algorithm
-    std::queue<int> queue;
-    for (int v = 0; v < static_cast<int>(in_degree.size()); v++) {
-        auto degree = in_degree[v];
-        if (degree == 0) {
-            queue.push(v);
+    // Calculate in-degrees and initialize the topological-sort queue.
+    levelize_queue.clear();
+    for (int node = 0; node < next_id; ++node) {
+        if (!active[node]) {
+            continue;
+        }
+        in_degree[node] = static_cast<int>(reverse_adjacency_list[node].size());
+        node_to_level[node] = -1;
+        if (in_degree[node] == 0) {
+            levelize_queue.push_back(node);
         }
     }
 
+    // Topological sort using Kahn's algorithm. Reuse storage from prior runs.
+    size_t queue_head = 0;
+    size_t level_index = 0;
     int current_level = 0;
-    while (!queue.empty()) {
-        int level_size = queue.size();
-        std::vector<int> current_level_nodes;
+    while (queue_head < levelize_queue.size()) {
+        size_t level_end = levelize_queue.size();
+        if (level_index == levels.size()) {
+            levels.emplace_back();
+        }
+        auto &current_level_nodes = levels[level_index];
+        current_level_nodes.clear();
+        current_level_nodes.reserve(level_end - queue_head);
 
-        for (int i = 0; i < level_size; ++i) {
-            int node = queue.front();
-            queue.pop();
-
+        while (queue_head < level_end) {
+            int node = levelize_queue[queue_head++];
             current_level_nodes.push_back(node);
             node_to_level[node] = current_level;
 
             // Reduce in-degree of successors
-            if (adjacency_list.contains(node)) {
-                for (auto &successor : adjacency_list[node]) {
-                    in_degree[successor]--;
-                    assert(in_degree[successor] >= 0);
-                    if (in_degree[successor] == 0) {
-                        queue.push(successor);
-                    }
+            for (int successor : adjacency_list[node]) {
+                in_degree[successor]--;
+                assert(in_degree[successor] >= 0);
+                if (in_degree[successor] == 0) {
+                    levelize_queue.push_back(successor);
                 }
             }
         }
 
-        levels.push_back(current_level_nodes);
+        level_index++;
         current_level++;
     }
+    levels.resize(level_index);
 }
 
 bool MergeGraph::is_acyclic() const {
-    // Use DFS to detect cycles
-    std::unordered_set<int> white, gray, black;
-
-    for (const auto &pair : adjacency_list) {
-        white.insert(pair.first);
-    }
+    std::vector<uint8_t> color(next_id, kUnvisited);
 
     std::function<bool(int)> dfs = [&](int node) -> bool {
-        white.erase(node);
-        gray.insert(node);
+        color[node] = kVisiting;
 
-        for (int successor : get_node_successors(node)) {
-            if (gray.count(successor)) {
+        for (int successor : adjacency_list[node]) {
+            if (color[successor] == kVisiting) {
                 return false; // Back edge found, cycle detected
             }
-            if (white.count(successor) && !dfs(successor)) {
+            if (color[successor] == kUnvisited && !dfs(successor)) {
                 return false;
             }
         }
 
-        gray.erase(node);
-        black.insert(node);
+        color[node] = kVisited;
         return true;
     };
 
-    while (!white.empty()) {
-        int start = *white.begin();
-        if (!dfs(start)) {
+    for (int node = 0; node < next_id; ++node) {
+        if (active[node] && color[node] == kUnvisited && !dfs(node)) {
             return false;
         }
     }
 
     return true;
-}
-
-void MergeGraph::remove_edge(int from, int to) {
-    auto &successors = adjacency_list[from];
-    successors.erase(std::remove(successors.begin(), successors.end(), to), successors.end());
-
-    auto &predecessors = reverse_adjacency_list[to];
-    predecessors.erase(std::remove(predecessors.begin(), predecessors.end(), from),
-                       predecessors.end());
 }

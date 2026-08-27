@@ -11,6 +11,8 @@ PartitionMerger::PartitionMerger(const ToucanGraph &G, const std::unordered_set<
 }
 
 void PartitionMerger::build_part_mg(const std::vector<std::unique_ptr<MicroPartition>> &parts) {
+    mg->reserve_nodes(parts.size() + exclude_nodes.size());
+
     // Add nodes for all parts
     for (size_t i = 0; i < parts.size(); ++i) {
         int part_id = mg->add_node();
