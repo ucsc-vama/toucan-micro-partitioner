@@ -7,16 +7,16 @@
 
 namespace Utils {
 
-std::unordered_map<int, int> count_elements(const std::vector<int> &lst) {
-    std::unordered_map<int, int> counts;
-    for (int num : lst) {
+std::unordered_map<NodeID, int> count_elements(const std::vector<NodeID> &lst) {
+    std::unordered_map<NodeID, int> counts;
+    for (NodeID num : lst) {
         counts[num]++;
     }
     return counts;
 }
 
-std::unordered_map<int, std::vector<int>> load_vec_info_file(const std::string &filename) {
-    std::unordered_map<int, std::vector<int>> ret;
+std::unordered_map<NodeID, std::vector<NodeID>> load_vec_info_file(const std::string &filename) {
+    std::unordered_map<NodeID, std::vector<NodeID>> ret;
     std::ifstream file(filename);
     if (!file.is_open()) {
         throw std::runtime_error("Cannot open file: " + filename);
@@ -34,7 +34,7 @@ std::unordered_map<int, std::vector<int>> load_vec_info_file(const std::string &
         if (parts.empty())
             continue;
 
-        std::vector<int> dat;
+        std::vector<NodeID> dat;
         for (const std::string &part : parts) {
             if (!part.empty()) {
                 dat.push_back(std::stoi(part));
@@ -45,8 +45,8 @@ std::unordered_map<int, std::vector<int>> load_vec_info_file(const std::string &
         if (dat.size() < 2)
             continue;
 
-        int vecDecl_node_id = dat[0];
-        std::vector<int> vecElem_ids(dat.begin() + 1, dat.end());
+        NodeID vecDecl_node_id = dat[0];
+        std::vector<NodeID> vecElem_ids(dat.begin() + 1, dat.end());
 
         if (ret.find(vecDecl_node_id) != ret.end()) {
             throw std::runtime_error("Duplicate vecDecl_node_id: " +

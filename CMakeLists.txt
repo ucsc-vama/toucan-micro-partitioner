@@ -26,6 +26,7 @@ set(SOURCES
 # Header files
 set(HEADERS
     include/ToucanGraph.h
+    include/NodeID.h
     include/MicroPartition.h
     include/MergeGraph.h
     include/PartitionMerger.h

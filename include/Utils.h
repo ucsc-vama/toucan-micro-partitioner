@@ -1,15 +1,16 @@
 #pragma once
 
+#include "NodeID.h"
 #include <string>
 #include <unordered_map>
 #include <vector>
 
 namespace Utils {
 // Count occurrences of elements in a vector
-std::unordered_map<int, int> count_elements(const std::vector<int> &lst);
+std::unordered_map<NodeID, int> count_elements(const std::vector<NodeID> &lst);
 
 // Load vector information from file
-std::unordered_map<int, std::vector<int>> load_vec_info_file(const std::string &filename);
+std::unordered_map<NodeID, std::vector<NodeID>> load_vec_info_file(const std::string &filename);
 
 // String utilities
 std::vector<std::string> split(const std::string &str, char delimiter);

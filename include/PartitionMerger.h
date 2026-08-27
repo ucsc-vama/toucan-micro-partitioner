@@ -11,7 +11,7 @@
 
 class PartitionMerger {
   public:
-    PartitionMerger(const ToucanGraph &G, const std::unordered_set<int> &exclude_nodes);
+    PartitionMerger(const ToucanGraph &G, const std::unordered_set<NodeID> &exclude_nodes);
     ~PartitionMerger() = default;
 
     // Core functionality
@@ -35,14 +35,14 @@ class PartitionMerger {
   private:
     std::unique_ptr<MergeGraph> mg;
     const ToucanGraph &G;
-    std::unordered_set<int> exclude_nodes;
-    std::unordered_set<int> exclude_part_ids;
+    std::unordered_set<NodeID> exclude_nodes;
+    std::unordered_set<NodeID> exclude_part_ids;
 
     // Maps partition ID to either MicroPartition or set of excluded nodes
-    std::unordered_map<int, std::unique_ptr<MicroPartition>> node_id_to_part;
-    std::unordered_map<int, std::unordered_set<int>> exclude_id_to_nodes;
+    std::unordered_map<NodeID, std::unique_ptr<MicroPartition>> node_id_to_part;
+    std::unordered_map<NodeID, std::unordered_set<NodeID>> exclude_id_to_nodes;
 
     // Helper methods
-    bool try_merge_upart_nodes(int to, const std::vector<int> &from_nodes,
+    bool try_merge_upart_nodes(NodeID to, const std::vector<NodeID> &from_nodes,
                                bool check_acyclic = false);
 };

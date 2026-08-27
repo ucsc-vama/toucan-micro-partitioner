@@ -30,7 +30,7 @@ MicroPartition &MicroPartition::operator=(const MicroPartition &other) {
 }
 
 void MicroPartition::calculate_node_level() {
-    for ([[maybe_unused]] int node : nodes) {
+    for ([[maybe_unused]] NodeID node : nodes) {
         // assert(excluded_nodes.find(node) == excluded_nodes.end());
         assert(G->has_node(node));
     }
@@ -39,17 +39,17 @@ void MicroPartition::calculate_node_level() {
     levels.clear();
     node_levels.clear();
 
-    std::unordered_map<int, int> in_degree;
-    for (int node : nodes) {
+    std::unordered_map<NodeID, int> in_degree;
+    for (NodeID node : nodes) {
         in_degree[node] = 0;
-        for (int pred : G->get_predecessors(node)) {
+        for (NodeID pred : G->get_predecessors(node)) {
             if (nodes.count(pred)) {
                 in_degree[node]++;
             }
         }
     }
 
-    std::queue<int> queue;
+    std::queue<NodeID> queue;
     for (const auto &pair : in_degree) {
         if (pair.second == 0) {
             queue.push(pair.first);
@@ -64,17 +64,17 @@ void MicroPartition::calculate_node_level() {
         }
 
         int level_size = queue.size();
-        std::vector<int> current_level_nodes;
+        std::vector<NodeID> current_level_nodes;
 
         for (int i = 0; i < level_size; ++i) {
-            int node = queue.front();
+            NodeID node = queue.front();
             queue.pop();
 
             current_level_nodes.push_back(node);
             node_levels[node] = current_level;
             processed_nodes++;
 
-            for (int successor : G->get_successors(node)) {
+            for (NodeID successor : G->get_successors(node)) {
                 if (nodes.count(successor)) {
                     in_degree[successor]--;
                     if (in_degree[successor] == 0) {
@@ -99,11 +99,11 @@ void MicroPartition::collect_variable_liveness() {
     var_life_cycle.clear();
 
     // Calculate variable lifetimes
-    for (int node : nodes) {
+    for (NodeID node : nodes) {
         int life_start = node_levels[node];
         int life_end = life_start;
 
-        for (int successor : G->get_successors(node)) {
+        for (NodeID successor : G->get_successors(node)) {
             if (nodes.find(successor) == nodes.end()) {
                 // Edge points outside partition
                 life_end = PART_MAX_LEVEL;
@@ -126,12 +126,12 @@ void MicroPartition::collect_variable_liveness() {
     // Handle external inputs
     // Since in micro partitioner, we cannot distinguish different VecArith result segments, just
     // treat each reference as unique for safety.
-    int nextUnusedVarId = INT_MAX;
-    for (int node : nodes) {
-        for (int pred : G->get_predecessors(node)) {
+    NodeID nextUnusedVarId = INT_MAX;
+    for (NodeID node : nodes) {
+        for (NodeID pred : G->get_predecessors(node)) {
             const auto &pred_attrs = G->get_nodes().at(pred);
 
-            int var_id = pred;
+            NodeID var_id = pred;
             if (is_merge_result_node_tag(pred_attrs.tag)) {
                 // Special handling for VecArith
                 // Don't care exact id, just make it unique
@@ -162,11 +162,11 @@ void MicroPartition::collect_variable_liveness() {
 bool MicroPartition::check_liveness_constraint() {
     assert(!var_life_cycle.empty());
 
-    std::unordered_map<int, std::unordered_set<int>> level_var_active;
-    std::unordered_map<int, std::unordered_set<int>> level_var_deactive;
+    std::unordered_map<int, std::unordered_set<NodeID>> level_var_active;
+    std::unordered_map<int, std::unordered_set<NodeID>> level_var_deactive;
 
     for (const auto &pair : var_life_cycle) {
-        int var = pair.first;
+        NodeID var = pair.first;
         int life_start = pair.second.first;
         int life_end = pair.second.second;
 
@@ -175,7 +175,7 @@ bool MicroPartition::check_liveness_constraint() {
     }
 
     // External vars
-    std::unordered_set<int> current_live_vars;
+    std::unordered_set<NodeID> current_live_vars;
     if (level_var_active.count(-1)) {
         current_live_vars = level_var_active[-1];
     }
@@ -192,7 +192,7 @@ bool MicroPartition::check_liveness_constraint() {
 
         // Deactivate variables
         if (level_var_deactive.count(level)) {
-            for (int var : level_var_deactive[level]) {
+            for (NodeID var : level_var_deactive[level]) {
                 assert(current_live_vars.count(var));
                 current_live_vars.erase(var);
             }
@@ -200,7 +200,7 @@ bool MicroPartition::check_liveness_constraint() {
 
         // Activate variables
         if (level_var_active.count(level)) {
-            for (int var : level_var_active[level]) {
+            for (NodeID var : level_var_active[level]) {
                 assert(current_live_vars.find(var) == current_live_vars.end());
                 current_live_vars.insert(var);
             }
@@ -209,7 +209,7 @@ bool MicroPartition::check_liveness_constraint() {
 
     // Handle final variables
     if (level_var_deactive.count(PART_MAX_LEVEL)) {
-        for ([[maybe_unused]] int var : level_var_deactive[PART_MAX_LEVEL]) {
+        for ([[maybe_unused]] NodeID var : level_var_deactive[PART_MAX_LEVEL]) {
             assert(current_live_vars.count(var));
         }
         assert(current_live_vars.size() == level_var_deactive[PART_MAX_LEVEL].size());
@@ -238,8 +238,8 @@ bool MicroPartition::check_correctness() {
     return check_liveness_constraint();
 }
 
-bool MicroPartition::try_add_nodes(const std::unordered_set<int> &new_nodes) {
-    // for (int node : new_nodes) {
+bool MicroPartition::try_add_nodes(const std::unordered_set<NodeID> &new_nodes) {
+    // for (NodeID node : new_nodes) {
     //     assert(excluded_nodes.find(node) == excluded_nodes.end());
     // }
 
@@ -247,11 +247,11 @@ bool MicroPartition::try_add_nodes(const std::unordered_set<int> &new_nodes) {
     return check_correctness();
 }
 
-std::unordered_set<int> find_exclude_nodes(const ToucanGraph &g) {
-    std::unordered_set<int> ret;
+std::unordered_set<NodeID> find_exclude_nodes(const ToucanGraph &g) {
+    std::unordered_set<NodeID> ret;
 
     for (const auto &node_pair : g.get_nodes()) {
-        int node = node_pair.first;
+        NodeID node = node_pair.first;
         const NodeAttributes &attrs = node_pair.second;
 
         if (is_exclude_node_tag(attrs.tag)) {
@@ -311,10 +311,10 @@ void report_part_info(const std::vector<std::unique_ptr<MicroPartition>> &parts)
 }
 
 std::vector<std::unique_ptr<MicroPartition>>
-partitioner2(const ToucanGraph &G, const std::unordered_set<int> &excluded_nodes) {
+partitioner2(const ToucanGraph &G, const std::unordered_set<NodeID> &excluded_nodes) {
 
     std::vector<std::unique_ptr<MicroPartition>> partitions;
-    std::unordered_set<int> visited = excluded_nodes;
+    std::unordered_set<NodeID> visited = excluded_nodes;
 
     // Ensure graph is levelized
     if (!G.is_levelized()) {
@@ -322,25 +322,25 @@ partitioner2(const ToucanGraph &G, const std::unordered_set<int> &excluded_nodes
     }
 
     // Create vertex-to-level mapping for O(1) lookups
-    std::unordered_map<int, int> vtx_to_level;
+    std::unordered_map<NodeID, int> vtx_to_level;
     vtx_to_level.reserve(G.get_nodes().size());
     const auto &levels = G.get_levels();
     for (size_t level_id = 0; level_id < levels.size(); ++level_id) {
-        for (int node : levels[level_id]) {
+        for (NodeID node : levels[level_id]) {
             vtx_to_level[node] = static_cast<int>(level_id);
         }
     }
 
     // Get topological order (reverse to start from sinks)
-    std::vector<int> topo_order;
+    std::vector<NodeID> topo_order;
     for (const auto &level : levels) {
-        for (int node : level) {
+        for (NodeID node : level) {
             topo_order.push_back(node);
         }
     }
     std::reverse(topo_order.begin(), topo_order.end());
 
-    for (int seed : topo_order) {
+    for (NodeID seed : topo_order) {
         if (visited.count(seed)) {
             continue;
         }
@@ -363,8 +363,8 @@ partitioner2(const ToucanGraph &G, const std::unordered_set<int> &excluded_nodes
         int seed_level = vtx_to_level.at(seed);
 
         // MFFC (Maximum Fanout-Free Cone) traversal
-        std::unordered_set<int> mffc_fringe;
-        for (int pred : G.get_predecessors(seed)) {
+        std::unordered_set<NodeID> mffc_fringe;
+        for (NodeID pred : G.get_predecessors(seed)) {
             mffc_fringe.insert(pred);
         }
 
@@ -372,13 +372,13 @@ partitioner2(const ToucanGraph &G, const std::unordered_set<int> &excluded_nodes
 
         while (!mffc_fringe.empty()) {
             // Find MFFC nodes (nodes whose all successors are in current partition)
-            std::vector<int> mffc_nodes;
-            for (int vtx : mffc_fringe) {
+            std::vector<NodeID> mffc_nodes;
+            for (NodeID vtx : mffc_fringe) {
                 if (visited.count(vtx))
                     continue;
 
                 bool all_successors_in_part = true;
-                for (int succ : G.get_successors(vtx)) {
+                for (NodeID succ : G.get_successors(vtx)) {
                     if (part->get_nodes().find(succ) == part->get_nodes().end()) {
                         all_successors_in_part = false;
                         break;
@@ -395,9 +395,9 @@ partitioner2(const ToucanGraph &G, const std::unordered_set<int> &excluded_nodes
             }
 
             // Find nodes at the right level distance using O(1) lookups
-            std::unordered_set<int> part_candidates;
+            std::unordered_set<NodeID> part_candidates;
             int mffc_max_level = -1;
-            for (int node : mffc_nodes) {
+            for (NodeID node : mffc_nodes) {
                 int node_level = vtx_to_level.at(node);
                 mffc_max_level = std::max(mffc_max_level, node_level);
             }
@@ -407,7 +407,7 @@ partitioner2(const ToucanGraph &G, const std::unordered_set<int> &excluded_nodes
                 break;
             }
 
-            for (int vtx : mffc_nodes) {
+            for (NodeID vtx : mffc_nodes) {
                 int vtx_level = vtx_to_level.at(vtx);
                 if (vtx_level + 1 == last_level) {
                     part_candidates.insert(vtx);
@@ -429,10 +429,10 @@ partitioner2(const ToucanGraph &G, const std::unordered_set<int> &excluded_nodes
             }
 
             // Update fringe for next iteration
-            std::unordered_set<int> mffc_fringe_next = mffc_fringe;
-            for (int vtx : part_candidates) {
+            std::unordered_set<NodeID> mffc_fringe_next = mffc_fringe;
+            for (NodeID vtx : part_candidates) {
                 mffc_fringe_next.erase(vtx);
-                for (int pred : G.get_predecessors(vtx)) {
+                for (NodeID pred : G.get_predecessors(vtx)) {
                     mffc_fringe_next.insert(pred);
                 }
             }
@@ -446,7 +446,7 @@ partitioner2(const ToucanGraph &G, const std::unordered_set<int> &excluded_nodes
         partitions.push_back(std::move(part));
 
         // Mark all nodes in this partition as visited
-        for (int node : partitions.back()->get_nodes()) {
+        for (NodeID node : partitions.back()->get_nodes()) {
             visited.insert(node);
         }
     }

@@ -110,8 +110,8 @@ void ToucanGraph::load(const std::string &file_path) {
     std::string line;
     int lineno = 0;
     int num_edges = 0, num_nodes = 0;
-    std::vector<std::pair<int, int>> edges_to_add;
-    std::unordered_set<int> invalid_nodes;
+    std::vector<std::pair<NodeID, NodeID>> edges_to_add;
+    std::unordered_set<NodeID> invalid_nodes;
 
     while (std::getline(file, line)) {
         if (lineno == 0) {
@@ -126,7 +126,7 @@ void ToucanGraph::load(const std::string &file_path) {
         if (parts.empty())
             continue;
 
-        int node_id = std::stoi(parts[0]);
+        NodeID node_id = std::stoi(parts[0]);
         max_node_id = std::max(node_id, max_node_id);
 
         if (parts.size() < 3) {
@@ -164,7 +164,7 @@ void ToucanGraph::load(const std::string &file_path) {
 
         // Collect edges
         for (size_t i = 3; i < parts.size(); ++i) {
-            int neighbor = std::stoi(parts[i]);
+            NodeID neighbor = std::stoi(parts[i]);
             edges_to_add.emplace_back(node_id, neighbor);
         }
 
@@ -174,7 +174,7 @@ void ToucanGraph::load(const std::string &file_path) {
     // Add all edges
     int actual_edge_count = 0;
     for (const auto &edge : edges_to_add) {
-        int source = edge.first, target = edge.second;
+        NodeID source = edge.first, target = edge.second;
 
         if (invalid_nodes.contains(source) || invalid_nodes.contains(target)) {
             continue;
@@ -208,13 +208,13 @@ void ToucanGraph::levelize() {
     levels.clear();
 
     // Calculate in-degrees
-    std::unordered_map<int, int> in_degree;
+    std::unordered_map<NodeID, int> in_degree;
     for (const auto &node : nodes) {
         in_degree[node.first] = get_in_degree(node.first);
     }
 
     // Topological sort using Kahn's algorithm
-    std::queue<int> queue;
+    std::queue<NodeID> queue;
     for (const auto &pair : in_degree) {
         if (pair.second == 0) {
             queue.push(pair.first);
@@ -224,17 +224,17 @@ void ToucanGraph::levelize() {
     int current_level = 0;
     while (!queue.empty()) {
         int level_size = queue.size();
-        std::vector<int> current_level_nodes;
+        std::vector<NodeID> current_level_nodes;
 
         for (int i = 0; i < level_size; ++i) {
-            int node = queue.front();
+            NodeID node = queue.front();
             queue.pop();
 
             current_level_nodes.push_back(node);
             nodes[node].level_id = current_level;
 
             // Reduce in-degree of successors
-            for (int successor : get_successors(node)) {
+            for (NodeID successor : get_successors(node)) {
                 in_degree[successor]--;
                 if (in_degree[successor] == 0) {
                     queue.push(successor);
@@ -249,17 +249,17 @@ void ToucanGraph::levelize() {
 
 bool ToucanGraph::is_acyclic() const {
     // Use DFS to detect cycles
-    std::unordered_set<int> white, gray, black;
+    std::unordered_set<NodeID> white, gray, black;
 
     for (const auto &node : nodes) {
         white.insert(node.first);
     }
 
-    std::function<bool(int)> dfs = [&](int node) -> bool {
+    std::function<bool(NodeID)> dfs = [&](NodeID node) -> bool {
         white.erase(node);
         gray.insert(node);
 
-        for (int successor : get_successors(node)) {
+        for (NodeID successor : get_successors(node)) {
             if (gray.count(successor)) {
                 return false; // Back edge found, cycle detected
             }
@@ -274,7 +274,7 @@ bool ToucanGraph::is_acyclic() const {
     };
 
     while (!white.empty()) {
-        int start = *white.begin();
+        NodeID start = *white.begin();
         if (!dfs(start)) {
             return false;
         }
@@ -283,9 +283,10 @@ bool ToucanGraph::is_acyclic() const {
     return true;
 }
 
-void ToucanGraph::expand_VecDecl(const std::unordered_map<int, std::vector<int>> &vecDeclElements) {
-    std::vector<int> vecDecl_node_ids;
-    std::vector<int> nodes_to_remove;
+void ToucanGraph::expand_VecDecl(
+    const std::unordered_map<NodeID, std::vector<NodeID>> &vecDeclElements) {
+    std::vector<NodeID> vecDecl_node_ids;
+    std::vector<NodeID> nodes_to_remove;
     int num_new_nodes = 0;
 
     // Find all VecDecl nodes
@@ -296,27 +297,27 @@ void ToucanGraph::expand_VecDecl(const std::unordered_map<int, std::vector<int>>
         }
     }
 
-    for (int node : vecDecl_node_ids) {
-        std::vector<int> vec_input_nodes = get_predecessors(node);
-        std::vector<int> vec_user_nodes = get_successors(node);
+    for (NodeID node : vecDecl_node_ids) {
+        std::vector<NodeID> vec_input_nodes = get_predecessors(node);
+        std::vector<NodeID> vec_user_nodes = get_successors(node);
         int weight = nodes[node].weight;
 
         // Vec info file should be consistent with graph info
         auto it = vecDeclElements.find(node);
         assert(it != vecDeclElements.end());
 
-        const std::vector<int> &vec_element_op_ids = it->second;
+        const std::vector<NodeID> &vec_element_op_ids = it->second;
 
         // At least one vecDecl element
         assert(weight > 0);
         int nop_node_weight = weight / vec_element_op_ids.size();
         assert(vec_input_nodes.size() <= static_cast<size_t>(weight));
 
-        std::vector<int> new_node_list;
+        std::vector<NodeID> new_node_list;
         for (size_t i = 0; i < vec_element_op_ids.size(); ++i) {
             // Insert NOP
             max_node_id++;
-            int node_id = max_node_id;
+            NodeID node_id = max_node_id;
             assert(!has_node(node_id));
 
             NodeAttributes attrs;
@@ -326,12 +327,12 @@ void ToucanGraph::expand_VecDecl(const std::unordered_map<int, std::vector<int>>
             add_node(node_id, attrs);
             new_node_list.push_back(node_id);
 
-            int edge_src = vec_element_op_ids[i];
+            NodeID edge_src = vec_element_op_ids[i];
             assert(std::find(vec_input_nodes.begin(), vec_input_nodes.end(), edge_src) !=
                    vec_input_nodes.end());
             add_edge(edge_src, node_id);
 
-            for (int d : vec_user_nodes) {
+            for (NodeID d : vec_user_nodes) {
                 add_edge(node_id, d);
             }
         }
@@ -341,7 +342,7 @@ void ToucanGraph::expand_VecDecl(const std::unordered_map<int, std::vector<int>>
         num_new_nodes += new_node_list.size();
 
         // Verify in-degree
-        for ([[maybe_unused]] int new_node : new_node_list) {
+        for ([[maybe_unused]] NodeID new_node : new_node_list) {
             assert(get_in_degree(new_node) == 1);
         }
     }
@@ -353,7 +354,7 @@ void ToucanGraph::expand_VecDecl(const std::unordered_map<int, std::vector<int>>
 }
 
 void ToucanGraph::remove_ConstDecl() {
-    std::vector<int> nodes_to_remove;
+    std::vector<NodeID> nodes_to_remove;
     for (const auto &node : nodes) {
         if (node.second.tag == NodeTag::ConstDecl) {
             nodes_to_remove.push_back(node.first);
@@ -371,7 +372,7 @@ void ToucanGraph::save_vector_def_info(const std::string &filename) const {
 
     for (const auto &pair : vecdecl_to_nop) {
         out << pair.first;
-        for (int nop : pair.second) {
+        for (NodeID nop : pair.second) {
             out << " " << nop;
         }
         out << "\n";
@@ -379,23 +380,23 @@ void ToucanGraph::save_vector_def_info(const std::string &filename) const {
     out.close();
 }
 
-std::vector<int> ToucanGraph::get_predecessors(int node) const {
+std::vector<NodeID> ToucanGraph::get_predecessors(NodeID node) const {
     if (reverse_adjacency_list.contains(node)) {
         return reverse_adjacency_list.at(node);
     }
     return {};
 }
 
-std::vector<int> ToucanGraph::get_successors(int node) const {
+std::vector<NodeID> ToucanGraph::get_successors(NodeID node) const {
     if (adjacency_list.contains(node)) {
         return adjacency_list.at(node);
     }
     return {};
 }
 
-bool ToucanGraph::has_node(int node) const { return nodes.contains(node); }
+bool ToucanGraph::has_node(NodeID node) const { return nodes.contains(node); }
 
-bool ToucanGraph::has_edge(int from, int to) const {
+bool ToucanGraph::has_edge(NodeID from, NodeID to) const {
     auto it = adjacency_list.find(from);
     if (it != adjacency_list.end()) {
         const auto &successors = it->second;
@@ -404,22 +405,22 @@ bool ToucanGraph::has_edge(int from, int to) const {
     return false;
 }
 
-int ToucanGraph::get_in_degree(int node) const {
+int ToucanGraph::get_in_degree(NodeID node) const {
     auto it = reverse_adjacency_list.find(node);
     return it != reverse_adjacency_list.end() ? it->second.size() : 0;
 }
 
-int ToucanGraph::get_out_degree(int node) const {
+int ToucanGraph::get_out_degree(NodeID node) const {
     auto it = adjacency_list.find(node);
     return it != adjacency_list.end() ? it->second.size() : 0;
 }
 
-int ToucanGraph::max_node() const {
+NodeID ToucanGraph::max_node() const {
     if (nodes.empty()) {
         return -1; // No nodes in graph
     }
 
-    int max_id = -1;
+    NodeID max_id = -1;
     for (const auto &pair : nodes) {
         max_id = std::max(max_id, pair.first);
     }
@@ -427,19 +428,19 @@ int ToucanGraph::max_node() const {
 }
 
 std::unique_ptr<ToucanGraph>
-ToucanGraph::create_subgraph(const std::unordered_set<int> &node_list) const {
+ToucanGraph::create_subgraph(const std::unordered_set<NodeID> &node_list) const {
     auto subgraph = std::make_unique<ToucanGraph>();
 
     // Add nodes
-    for (int node : node_list) {
+    for (NodeID node : node_list) {
         if (has_node(node)) {
             subgraph->add_node(node, nodes.at(node));
         }
     }
 
     // Add edges
-    for (int node : node_list) {
-        for (int successor : get_successors(node)) {
+    for (NodeID node : node_list) {
+        for (NodeID successor : get_successors(node)) {
             if (node_list.count(successor)) {
                 subgraph->add_edge(node, successor);
             }
@@ -449,31 +450,31 @@ ToucanGraph::create_subgraph(const std::unordered_set<int> &node_list) const {
     return subgraph;
 }
 
-void ToucanGraph::add_node(int node_id, const NodeAttributes &attrs) {
+void ToucanGraph::add_node(NodeID node_id, const NodeAttributes &attrs) {
     nodes[node_id] = attrs;
     adjacency_list[node_id] = {};
     reverse_adjacency_list[node_id] = {};
 }
 
-void ToucanGraph::add_edge(int from, int to) {
+void ToucanGraph::add_edge(NodeID from, NodeID to) {
     adjacency_list[from].push_back(to);
     reverse_adjacency_list[to].push_back(from);
     edge_count++;
 }
 
-void ToucanGraph::remove_node(int node_id) {
+void ToucanGraph::remove_node(NodeID node_id) {
     if (!has_node(node_id))
         return;
 
     // Remove all edges involving this node
-    for (int predecessor : get_predecessors(node_id)) {
+    for (NodeID predecessor : get_predecessors(node_id)) {
         auto &successors = adjacency_list[predecessor];
         successors.erase(std::remove(successors.begin(), successors.end(), node_id),
                          successors.end());
         edge_count--;
     }
 
-    for (int successor : get_successors(node_id)) {
+    for (NodeID successor : get_successors(node_id)) {
         auto &predecessors = reverse_adjacency_list[successor];
         predecessors.erase(std::remove(predecessors.begin(), predecessors.end(), node_id),
                            predecessors.end());
@@ -485,8 +486,8 @@ void ToucanGraph::remove_node(int node_id) {
     reverse_adjacency_list.erase(node_id);
 }
 
-void ToucanGraph::remove_nodes(const std::vector<int> &nodes_to_remove) {
-    for (int node : nodes_to_remove) {
+void ToucanGraph::remove_nodes(const std::vector<NodeID> &nodes_to_remove) {
+    for (NodeID node : nodes_to_remove) {
         remove_node(node);
     }
 }
