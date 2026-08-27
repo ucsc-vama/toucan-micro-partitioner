@@ -51,18 +51,20 @@ void MergeGraph::add_edges(const std::vector<std::pair<NodeID, NodeID>> &edges) 
     }
 }
 
-std::vector<NodeID> MergeGraph::get_node_successors(NodeID node) const {
+const std::vector<NodeID> &MergeGraph::get_node_successors(NodeID node) const {
     if (has_node(node)) {
         return adjacency_list[node];
     }
-    return {};
+    static const std::vector<NodeID> empty;
+    return empty;
 }
 
-std::vector<NodeID> MergeGraph::get_node_predecessors(NodeID node) const {
+const std::vector<NodeID> &MergeGraph::get_node_predecessors(NodeID node) const {
     if (has_node(node)) {
         return reverse_adjacency_list[node];
     }
-    return {};
+    static const std::vector<NodeID> empty;
+    return empty;
 }
 
 int MergeGraph::get_node_in_degree(NodeID node) const {

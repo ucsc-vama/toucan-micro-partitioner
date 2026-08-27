@@ -289,7 +289,7 @@ int PartitionMerger::merge_direct_child() {
             continue;
         }
 
-        auto merge_froms = mg->get_node_successors(merge_to);
+        const auto &merge_froms = mg->get_node_successors(merge_to);
         if (merge_froms.size() != 1) {
             continue;
         }
@@ -354,7 +354,7 @@ int PartitionMerger::merge_adjacent_group() {
                 continue;
             }
 
-            auto childs = mg->get_node_successors(each_node);
+            const auto &childs = mg->get_node_successors(each_node);
             std::unordered_set<NodeID> childs_next_level;
 
             const auto &node_to_level = mg->get_node_to_level();
@@ -371,7 +371,7 @@ int PartitionMerger::merge_adjacent_group() {
             // Find all predecessors of children at this level
             std::unordered_set<NodeID> child_all_predecessors;
             for (NodeID c : childs_next_level) {
-                auto preds = mg->get_node_predecessors(c);
+                const auto &preds = mg->get_node_predecessors(c);
                 child_all_predecessors.insert(preds.begin(), preds.end());
             }
 

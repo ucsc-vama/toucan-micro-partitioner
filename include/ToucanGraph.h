@@ -62,8 +62,8 @@ class ToucanGraph {
     const std::vector<std::vector<NodeID>> &get_levels() const { return levels; }
 
     // Graph queries
-    std::vector<NodeID> get_predecessors(NodeID node) const;
-    std::vector<NodeID> get_successors(NodeID node) const;
+    const std::vector<NodeID> &get_predecessors(NodeID node) const;
+    const std::vector<NodeID> &get_successors(NodeID node) const;
     bool has_node(NodeID node) const;
     bool has_edge(NodeID from, NodeID to) const;
     int get_in_degree(NodeID node) const;

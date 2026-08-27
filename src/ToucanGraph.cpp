@@ -380,18 +380,20 @@ void ToucanGraph::save_vector_def_info(const std::string &filename) const {
     out.close();
 }
 
-std::vector<NodeID> ToucanGraph::get_predecessors(NodeID node) const {
+const std::vector<NodeID> &ToucanGraph::get_predecessors(NodeID node) const {
     if (reverse_adjacency_list.contains(node)) {
         return reverse_adjacency_list.at(node);
     }
-    return {};
+    static const std::vector<NodeID> empty;
+    return empty;
 }
 
-std::vector<NodeID> ToucanGraph::get_successors(NodeID node) const {
+const std::vector<NodeID> &ToucanGraph::get_successors(NodeID node) const {
     if (adjacency_list.contains(node)) {
         return adjacency_list.at(node);
     }
-    return {};
+    static const std::vector<NodeID> empty;
+    return empty;
 }
 
 bool ToucanGraph::has_node(NodeID node) const { return nodes.contains(node); }

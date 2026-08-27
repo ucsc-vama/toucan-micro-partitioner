@@ -17,8 +17,8 @@ class MergeGraph {
     void add_edges(const std::vector<std::pair<NodeID, NodeID>> &edges);
 
     // Graph queries
-    std::vector<NodeID> get_node_successors(NodeID node) const;
-    std::vector<NodeID> get_node_predecessors(NodeID node) const;
+    const std::vector<NodeID> &get_node_successors(NodeID node) const;
+    const std::vector<NodeID> &get_node_predecessors(NodeID node) const;
     int get_node_in_degree(NodeID node) const;
     bool has_node(NodeID node) const;
     size_t num_nodes() const { return live_node_count; }
