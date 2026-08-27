@@ -504,7 +504,7 @@ int PartitionMerger::merge_siblings() {
                 for (int vars : successors_live_vars) {
                     total_live_vars += vars;
                 }
-                if (total_live_vars <= 32) {
+                if (total_live_vars <= GPU_WARP_SIZE) {
                     break;
                 } else {
                     // Remove largest part
@@ -561,7 +561,7 @@ int PartitionMerger::merge_same_level() {
 
         const auto &levels = mg->get_levels();
 
-        // Get valid nodes at current level (not excluded, with live vars < 32)
+        // Get valid nodes at current level (not excluded, with live vars below the warp size)
         std::vector<NodeID> nodes_valid;
         for (NodeID n : levels[current_level]) {
             if (node_id_to_part.contains(n) && (!exclude_part_ids.contains(n))) {
@@ -569,10 +569,10 @@ int PartitionMerger::merge_same_level() {
             }
         }
 
-        // Filter nodes with live vars < 32
+        // Filter nodes with live vars below the warp size
         std::vector<NodeID> nodes_to_consider;
         for (NodeID n : nodes_valid) {
-            if (node_id_to_part.at(n)->get_max_live_vars() < 32) {
+            if (node_id_to_part.at(n)->get_max_live_vars() < GPU_WARP_SIZE) {
                 nodes_to_consider.push_back(n);
             }
         }

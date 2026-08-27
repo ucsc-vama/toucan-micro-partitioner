@@ -1,14 +1,11 @@
 #pragma once
 
+#include "Common.h"
 #include "ToucanGraph.h"
 #include <memory>
 #include <unordered_map>
 #include <unordered_set>
 #include <vector>
-
-constexpr int GPU_WARP_SIZE = 32;
-constexpr int PART_MAX_LEVEL = 9999;
-constexpr int MAX_PARTITION_SIZE = 99999;
 
 class MicroPartition {
   public:

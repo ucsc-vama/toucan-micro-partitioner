@@ -1,6 +1,6 @@
 #pragma once
 
-#include "NodeID.h"
+#include "Common.h"
 #include <memory>
 #include <string>
 #include <unordered_map>

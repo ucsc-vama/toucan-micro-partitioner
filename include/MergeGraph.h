@@ -1,6 +1,6 @@
 #pragma once
 
-#include "NodeID.h"
+#include "Common.h"
 #include <cstddef>
 #include <unordered_set>
 #include <vector>
