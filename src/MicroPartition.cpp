@@ -35,13 +35,6 @@ void MicroPartition::calculate_node_level() {
         assert(G->has_node(node));
     }
 
-    // Create subgraph for this partition
-    auto subgraph = G->create_subgraph(nodes);
-
-    if (!subgraph->is_acyclic()) {
-        throw std::runtime_error("The graph must be a Directed Acyclic Graph (DAG) to levelize.");
-    }
-
     // Topological sort to assign levels
     levels.clear();
     node_levels.clear();
@@ -64,6 +57,7 @@ void MicroPartition::calculate_node_level() {
     }
 
     int current_level = 0;
+    size_t processed_nodes = 0;
     while (!queue.empty()) {
         if (current_level >= PART_MAX_LEVEL) {
             throw std::runtime_error("Partition level exceeded maximum");
@@ -78,6 +72,7 @@ void MicroPartition::calculate_node_level() {
 
             current_level_nodes.push_back(node);
             node_levels[node] = current_level;
+            processed_nodes++;
 
             for (int successor : G->get_successors(node)) {
                 if (nodes.count(successor)) {
@@ -91,6 +86,10 @@ void MicroPartition::calculate_node_level() {
 
         levels.push_back(current_level_nodes);
         current_level++;
+    }
+
+    if (processed_nodes != nodes.size()) {
+        throw std::runtime_error("The graph must be a Directed Acyclic Graph (DAG) to levelize.");
     }
 }
 
