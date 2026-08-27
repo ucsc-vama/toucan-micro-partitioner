@@ -5,6 +5,7 @@
 #include <cstdint>
 #include <iostream>
 #include <queue>
+#include <stdexcept>
 #include <unordered_set>
 
 MicroPartition::MicroPartition(const ToucanGraph *graph) : G(graph) {}
@@ -341,9 +342,9 @@ partitioner2(const ToucanGraph &G, const std::unordered_set<NodeID> &excluded_no
         int seed_in_degree = G.get_in_degree(seed);
         if (seed_in_degree > 3) {
             const auto &seed_attrs = G.get_nodes().at(seed);
-            std::cout << "Node " << seed << " has more than 3 inputs (" << seed_in_degree
-                      << "). This node is a " << node_tag_to_string(seed_attrs.tag) << std::endl;
-            exit(-1);
+            throw std::runtime_error("Node " + std::to_string(seed) + " has more than 3 inputs (" +
+                                     std::to_string(seed_in_degree) + "). This node is a " +
+                                     node_tag_to_string(seed_attrs.tag));
         }
 
         // Create new partition starting with seed
