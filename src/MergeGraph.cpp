@@ -225,7 +225,8 @@ void MergeGraph::edge_dedup() {
         auto &predecessors = reverse_adjacency_list[node];
         if (predecessors.size() > 1) {
             std::sort(predecessors.begin(), predecessors.end());
-            predecessors.erase(std::unique(predecessors.begin(), predecessors.end()), predecessors.end());
+            predecessors.erase(std::unique(predecessors.begin(), predecessors.end()),
+                               predecessors.end());
         }
     }
 }
