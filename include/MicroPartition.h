@@ -33,16 +33,12 @@ class MicroPartition {
     std::vector<std::vector<NodeID>> levels;
     std::unordered_map<NodeID, int> node_levels;
 
-    // Variable lifecycle: node_id -> (life_start, life_end)
-    std::unordered_map<NodeID, std::pair<int, int>> var_life_cycle;
-
     int max_live_vars = -1;
     int num_input_vars = -1;
     int num_output_vars = -1;
 
     // Helper methods
     void calculate_node_level();
-    void collect_variable_liveness();
     bool check_liveness_constraint();
 };
 

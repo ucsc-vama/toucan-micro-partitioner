@@ -49,3 +49,16 @@ target_compile_options(micro_partitioner PRIVATE
 
 # Install target
 install(TARGETS micro_partitioner DESTINATION bin)
+
+include(CTest)
+if(BUILD_TESTING)
+    add_executable(check_liveness
+        tests/check_liveness.cpp
+        src/MicroPartition.cpp
+        src/ToucanGraph.cpp
+        src/Utils.cpp
+    )
+    target_compile_options(check_liveness PRIVATE -Wall -Wextra -Wpedantic)
+    add_test(NAME micro_partition_liveness
+        COMMAND check_liveness "${CMAKE_CURRENT_BINARY_DIR}/liveness-test.graph")
+endif()

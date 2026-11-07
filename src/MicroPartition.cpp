@@ -1,8 +1,6 @@
 #include "MicroPartition.h"
 #include <algorithm>
 #include <cassert>
-#include <climits>
-#include <cstdint>
 #include <iostream>
 #include <queue>
 #include <stdexcept>
@@ -74,96 +72,64 @@ void MicroPartition::calculate_node_level() {
     }
 }
 
-void MicroPartition::collect_variable_liveness() {
-    assert(!levels.empty());
-
-    var_life_cycle.clear();
-
-    // Calculate variable lifetimes
-    for (NodeID node : nodes) {
-        int life_start = node_levels[node];
-        int life_end = life_start;
-
-        for (NodeID successor : G->get_successors(node)) {
-            if (nodes.find(successor) == nodes.end()) {
-                // Edge points outside partition
-                life_end = PART_MAX_LEVEL;
-                break;
-            } else {
-                assert(node_levels[successor] > life_start);
-                life_end = std::max(life_end, node_levels[successor]);
-            }
-        }
-
-        if (life_start != life_end) {
-            assert(!var_life_cycle.contains(node));
-            var_life_cycle[node] = {life_start, life_end};
-        } else {
-            // Sink node - should not happen in normal cases
-            assert(false);
-        }
-    }
-
-    // Handle external inputs
-    // Since in micro partitioner, we cannot distinguish different VecArith result segments, just
-    // treat each reference as unique for safety.
-    NodeID nextUnusedVarId = INT_MAX;
-    for (NodeID node : nodes) {
-        for (NodeID pred : G->get_predecessors(node)) {
-            const auto &pred_attrs = G->get_nodes().at(pred);
-
-            NodeID var_id = pred;
-            if (is_merge_result_node_tag(pred_attrs.tag)) {
-                // Special handling for VecArith
-                // Don't care exact id, just make it unique
-                var_id = nextUnusedVarId;
-                nextUnusedVarId--;
-                assert(nextUnusedVarId > 0);
-                assert(!var_life_cycle.contains(var_id));
-                assert(!nodes.contains(var_id) && "If this hit, there may be too many nodes");
-            }
-            if (nodes.count(pred)) {
-                assert(var_life_cycle.count(var_id));
-            } else {
-                // External edge
-                int life_start = -1;
-                int life_end = node_levels[node];
-
-                if (var_life_cycle.count(var_id)) {
-                    int old_life_end = var_life_cycle[var_id].second;
-                    var_life_cycle[var_id] = {life_start, std::max(life_end, old_life_end)};
-                } else {
-                    var_life_cycle[var_id] = {life_start, life_end};
-                }
-            }
-        }
-    }
-}
-
 bool MicroPartition::check_liveness_constraint() {
-    assert(!var_life_cycle.empty());
+    assert(!levels.empty());
 
     std::vector<int> activations(levels.size(), 0);
     std::vector<int> deactivations(levels.size(), 0);
+    std::unordered_map<NodeID, int> input_last_use;
     int initial_live_vars = 0;
     int final_live_vars = 0;
 
-    for (const auto &pair : var_life_cycle) {
-        int life_start = pair.second.first;
-        int life_end = pair.second.second;
+    for (NodeID node : nodes) {
+        int life_start = node_levels.at(node);
+        int life_end = life_start;
 
-        if (life_start == -1) {
-            initial_live_vars++;
-        } else {
-            assert(life_start >= 0 && static_cast<size_t>(life_start) < levels.size());
-            activations[life_start]++;
+        for (NodeID successor : G->get_successors(node)) {
+            if (!nodes.contains(successor)) {
+                life_end = PART_MAX_LEVEL;
+                break;
+            }
+            assert(node_levels.at(successor) > life_start);
+            life_end = std::max(life_end, node_levels.at(successor));
         }
 
-        if (life_end == PART_MAX_LEVEL) {
-            final_live_vars++;
+        // Internal values are unique, so count their lifetime boundaries directly.
+        if (life_start != life_end) {
+            activations[life_start]++;
+            if (life_end == PART_MAX_LEVEL) {
+                final_live_vars++;
+            } else {
+                deactivations[life_end]++;
+            }
         } else {
-            assert(life_end >= 0 && static_cast<size_t>(life_end) < levels.size());
-            deactivations[life_end]++;
+            assert(false && "Partition node must have a consumer");
+        }
+
+        for (NodeID pred : G->get_predecessors(node)) {
+            if (nodes.contains(pred)) {
+                assert(!is_merge_result_node_tag(G->get_nodes().at(pred).tag));
+                continue;
+            }
+
+            if (is_merge_result_node_tag(G->get_nodes().at(pred).tag)) {
+                // Each vector-result edge may name a different segment. Count it
+                // separately even when multiple edges have the same predecessor.
+                initial_live_vars++;
+                deactivations[life_start]++;
+                continue;
+            }
+
+            // Shared scalar inputs occupy one slot until their last consumer.
+            auto [it, inserted] = input_last_use.try_emplace(pred, life_start);
+            if (inserted) {
+                initial_live_vars++;
+                deactivations[life_start]++;
+            } else if (life_start > it->second) {
+                deactivations[it->second]--;
+                deactivations[life_start]++;
+                it->second = life_start;
+            }
         }
     }
 
@@ -207,7 +173,6 @@ bool MicroPartition::check_correctness() {
     }
 
     calculate_node_level();
-    collect_variable_liveness();
     return check_liveness_constraint();
 }
 
