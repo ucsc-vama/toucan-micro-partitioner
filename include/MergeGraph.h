@@ -48,6 +48,9 @@ class MergeGraph {
     std::vector<NodeID> levelize_queue;
     std::vector<NodeID> nodes_to_remove;
     std::vector<unsigned char> pending_removal;
+    // Levels before this index are unchanged. levels.size() means the cache is current.
+    int first_dirty_level = 0;
 
+    void append_edge(NodeID source, NodeID target);
     bool is_acyclic() const;
 };

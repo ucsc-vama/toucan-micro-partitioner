@@ -27,6 +27,7 @@ void MergeGraph::reserve_nodes(size_t node_count) {
 }
 
 NodeID MergeGraph::add_node() {
+    first_dirty_level = 0;
     NodeID node_id = next_id++;
     adjacency_list.emplace_back();
     reverse_adjacency_list.emplace_back();
@@ -39,6 +40,11 @@ NodeID MergeGraph::add_node() {
 }
 
 void MergeGraph::add_edge(NodeID source, NodeID target) {
+    first_dirty_level = 0;
+    append_edge(source, target);
+}
+
+void MergeGraph::append_edge(NodeID source, NodeID target) {
     assert(has_node(source));
     assert(has_node(target));
     adjacency_list[source].push_back(target);
@@ -137,6 +143,12 @@ bool MergeGraph::merge_is_acyclic(const std::unordered_set<NodeID> &nodes_to_mer
 }
 
 void MergeGraph::merge_nodes(NodeID to, const std::vector<NodeID> &from_list) {
+    // Contracting a group cannot affect levels before its earliest member. Keep
+    // that prefix, including its traversal order, until the next levelization.
+    first_dirty_level = std::min(first_dirty_level, std::max(0, node_to_level[to]));
+    for (NodeID from : from_list) {
+        first_dirty_level = std::min(first_dirty_level, std::max(0, node_to_level[from]));
+    }
     std::unordered_set<NodeID> from_set(from_list.begin(), from_list.end());
 
     // Collect new edges for the 'to' node
@@ -161,10 +173,10 @@ void MergeGraph::merge_nodes(NodeID to, const std::vector<NodeID> &from_list) {
 
     // Add new edges
     for (NodeID pred : new_predecessors) {
-        add_edge(pred, to);
+        append_edge(pred, to);
     }
     for (NodeID succ : new_successors) {
-        add_edge(to, succ);
+        append_edge(to, succ);
     }
 
     // Remove the merged nodes
@@ -179,6 +191,7 @@ void MergeGraph::merge_nodes(NodeID to, const std::vector<NodeID> &from_list) {
 void MergeGraph::graph_gc() {
     for (NodeID node : nodes_to_remove) {
         assert(has_node(node));
+        first_dirty_level = std::min(first_dirty_level, std::max(0, node_to_level[node]));
 
         // Remove all edges involving this node
         for (NodeID pred : get_node_predecessors(node)) {
@@ -205,6 +218,9 @@ void MergeGraph::graph_gc() {
 }
 
 void MergeGraph::edge_dedup() {
+    // Sorting adjacency lists can change Kahn's traversal order even when the
+    // graph's levels do not change.
+    first_dirty_level = 0;
     // Sort each adjacency list, then remove parallel edges in place.
     for (NodeID node = 0; node < next_id; ++node) {
         if (!active[node]) {
@@ -240,23 +256,58 @@ void MergeGraph::check_graph() const {
 void MergeGraph::levelize() {
     assert(live_node_count != 0);
 
-    // Calculate in-degrees and initialize the topological-sort queue.
+    if (!levels.empty() && static_cast<size_t>(first_dirty_level) == levels.size()) {
+        return;
+    }
+
+    // Replay the unchanged level immediately before the affected region. Its
+    // outgoing edges determine the exact queue order of the first changed level.
+    int start_level = std::max(0, first_dirty_level - 1);
+    size_t prefix_nodes = 0;
+    for (int level = 0; level < start_level; ++level) {
+        prefix_nodes += levels[level].size();
+    }
+    // Rebuilding a suffix also scans its incoming edges. Use the full traversal
+    // when too little of the graph can be skipped to offset that extra work.
+    if (prefix_nodes < live_node_count / 2) {
+        start_level = 0;
+    }
+
     levelize_queue.clear();
-    for (NodeID node = 0; node < next_id; ++node) {
-        if (!active[node]) {
-            continue;
+    if (start_level == 0) {
+        // Calculate in-degrees and initialize the topological-sort queue.
+        for (NodeID node = 0; node < next_id; ++node) {
+            if (!active[node]) {
+                continue;
+            }
+            in_degree[node] = static_cast<int>(reverse_adjacency_list[node].size());
+            node_to_level[node] = -1;
+            if (in_degree[node] == 0) {
+                levelize_queue.push_back(node);
+            }
         }
-        in_degree[node] = static_cast<int>(reverse_adjacency_list[node].size());
-        node_to_level[node] = -1;
-        if (in_degree[node] == 0) {
-            levelize_queue.push_back(node);
+    } else {
+        levelize_queue.assign(levels[start_level].begin(), levels[start_level].end());
+        for (size_t level = start_level + 1; level < levels.size(); ++level) {
+            for (NodeID node : levels[level]) {
+                if (!active[node]) {
+                    continue;
+                }
+                int remaining = 0;
+                for (NodeID pred : reverse_adjacency_list[node]) {
+                    remaining += node_to_level[pred] >= start_level;
+                }
+                // Nodes in the affected region cannot move into the saved prefix.
+                assert(remaining > 0);
+                in_degree[node] = remaining;
+            }
         }
     }
 
     // Topological sort using Kahn's algorithm. Reuse storage from prior runs.
     size_t queue_head = 0;
-    size_t level_index = 0;
-    int current_level = 0;
+    size_t level_index = start_level;
+    int current_level = start_level;
     while (queue_head < levelize_queue.size()) {
         size_t level_end = levelize_queue.size();
         if (level_index == levels.size()) {
@@ -285,6 +336,7 @@ void MergeGraph::levelize() {
         current_level++;
     }
     levels.resize(level_index);
+    first_dirty_level = static_cast<int>(levels.size());
 }
 
 bool MergeGraph::is_acyclic() const {

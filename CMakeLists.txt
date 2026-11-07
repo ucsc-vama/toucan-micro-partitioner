@@ -61,4 +61,8 @@ if(BUILD_TESTING)
     target_compile_options(check_liveness PRIVATE -Wall -Wextra -Wpedantic)
     add_test(NAME micro_partition_liveness
         COMMAND check_liveness "${CMAKE_CURRENT_BINARY_DIR}/liveness-test.graph")
+
+    add_executable(check_levelize tests/check_levelize.cpp src/MergeGraph.cpp)
+    target_compile_options(check_levelize PRIVATE -Wall -Wextra -Wpedantic)
+    add_test(NAME merge_graph_levelize COMMAND check_levelize)
 endif()
